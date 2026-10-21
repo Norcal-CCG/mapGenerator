@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>CBRE Amenity Explorer</title>
+<title>CBRE Amenity Map Maker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
@@ -94,7 +94,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 <div id="wrap">
  <div id="side">
   <img id="logo" alt="" hidden>
-  <h2 id="title">CBRE Amenity Explorer</h2>
+  <h2 id="title">Amenity Map</h2>
   <p class="sub"><b id="pname"></b><br><span id="paddr"></span></p>
   <p class="sub">Click a location to see it in relation to the property.</p>
   <div id="filters" hidden></div>
@@ -114,7 +114,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 <div id="loader" class="hide">
  <div class="panel">
   <h3>Load amenity data</h3>
-  <p>Drop in the CSV from the Amenity Explorer agent, or paste its text below.</p>
+  <p>Drop in a CSV from BAM 2.0, Copilot, or other source, or paste its text below. Sample Prompt - can you make me a downloadable CSV file with a list of amenities within a <b>15 minute walking distance<b> from <b>Salesforce Tower, San Francisco<b>? Please include the following information for each amenity - Name, Category, Address, Latitude, Longitude, Website (these should be the column headers, "categories" should include Café, Restaurant, Fitness, Hotel, Retail)</p>
   <div id="drop">Drop a .csv file here, or click to choose one</div>
   <input type="file" id="file" accept=".csv,text/csv" hidden>
   <textarea id="paste" placeholder="Name,Category,Address,Latitude,Longitude,Website&#10;&quot;Property Name&quot;,Subject Property,&quot;Address&quot;,37.789800,-122.396800,"></textarea>
@@ -190,7 +190,7 @@ var ICONS = {"coffee":"☕","cafe":"☕","cafes":"☕","café":"☕","cafés":"�
 var PALETTE = ["#E4572E","#2E86AB","#F2B33D","#8E5BA8","#3BAA6E","#D64F8A","#1B9AAA","#8C6D46","#F28C28","#5C6BC0"];
 
 /* ---------- Look & feel options ---------- */
-var DEFAULTS = {title:"CBRE Amenity Explorer",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#79C98A",prop:"#003F2D",amen:"#79C98A",
+var DEFAULTS = {title:"Amenity Map",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#79C98A",prop:"#003F2D",amen:"#79C98A",
  headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},startCollapsed:false};
 var PRESETS = {
  "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#79C98A",prop:"#003F2D",amen:"#79C98A"},
@@ -343,7 +343,7 @@ function render(d){
  var P=[d.property.lat,d.property.lng],active=null,bounds=[P];
  $("pname").textContent=d.property.name;
  $("paddr").textContent=d.property.address;
- document.title=d.property.name+" – Amenity Explorer";
+ document.title=d.property.name+" – Amenity Map";
  L.marker(P,{icon:propIcon,zIndexOffset:1000}).addTo(layer)
   .bindPopup("<b>"+esc(d.property.name)+"</b><br>"+esc(d.property.address))
   .bindTooltip(esc(d.property.name),{permanent:true,direction:"top",offset:[0,-16],className:"prop-label"});
@@ -520,8 +520,8 @@ $("btnSave").onclick=function(){
  var html=PRISTINE
   .replace(/<script id="csv-data"[^>]*>[\s\S]*?<\/script>/,function(){return dataTag;})
   .replace(/<script id="settings-data"[^>]*>[\s\S]*?<\/script>/,function(){return lookTag;})
-  .replace(/<title>[\s\S]*?<\/title>/,function(){return "<title>"+esc(DATA.property.name)+" – Amenity Explorer<\/title>";});
- download(html,"text/html;charset=utf-8",fileBase()+"_Amenity_Explorer.html");
+  .replace(/<title>[\s\S]*?<\/title>/,function(){return "<title>"+esc(DATA.property.name)+" – Amenity Map<\/title>";});
+ download(html,"text/html;charset=utf-8",fileBase()+"_Amenity_Map.html");
 };
 
 /* ---------- Start ---------- */
