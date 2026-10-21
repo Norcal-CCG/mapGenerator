@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CBRE Amenity Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<style>
+:root{--side-bg:#003F2D;--side-text:#FFFFFF;--accent:#79C98A;--accent-text:#003F2D;--prop:#003F2D;--prop-text:#FFFFFF;--amen:#79C98A;
+ --head-font:"Segoe UI",Arial,sans-serif;--body-font:"Segoe UI",Arial,sans-serif;--ui:#003F2D}
+html,body{height:100%;margin:0;font-family:var(--body-font)}
+#wrap{display:flex;height:100%;min-height:600px}
+#map{min-height:0}
+#side{width:340px;flex:none;box-sizing:border-box;background:var(--side-bg);color:var(--side-text);padding:18px;overflow-y:auto;display:flex;flex-direction:column}
+#map{flex:1;background:#e8ece9}
+#logo{display:block;max-width:100%;max-height:60px;object-fit:contain;object-position:left;margin:0 0 14px}
+#logo[hidden]{display:none}
+h2{margin:0 0 4px;font:600 22px/1.25 var(--head-font)}
+.sub{font-size:13px;opacity:.82;margin:0 0 12px}
+.cat{margin:18px 0 6px;font:600 12px var(--head-font);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.card{background:color-mix(in srgb,var(--side-text) 11%,transparent);padding:10px 12px;border-radius:8px;margin:6px 0;cursor:pointer}
+.card:hover,.card.active{background:color-mix(in srgb,var(--side-text) 22%,transparent)}
+.card .t{font-size:12px;opacity:.8;margin-top:2px}
+#tools{margin-top:auto;padding-top:16px;border-top:1px solid color-mix(in srgb,var(--side-text) 22%,transparent)}
+#tools button{display:block;width:100%;margin:8px 0 0;padding:10px;border:0;border-radius:6px;font:600 14px var(--body-font);cursor:pointer;background:var(--accent);color:var(--accent-text)}
+#tools button.ghost{background:transparent;color:var(--side-text);border:1px solid color-mix(in srgb,var(--side-text) 45%,transparent)}
+#tools .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+#note{font-size:12px;opacity:.8;margin-top:10px;white-space:pre-line}
+body.view #tools{display:none}
+.leaflet-container{font-family:var(--body-font)}
+.prop-label{background:var(--prop);color:var(--prop-text);border:0;font:600 13px var(--head-font)}
+.prop-label:before{border-top-color:var(--prop)}
+.cat{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:4px 0;text-align:left;cursor:pointer}
+.cat .count{font-weight:400;opacity:.7;letter-spacing:0}
+.cat .chev{margin-left:auto;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .2s}
+.group.collapsed .chev{transform:rotate(-45deg)}
+.group.collapsed .items{display:none}
+.dot{display:none;width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--side-text) 35%,transparent)}
+body.bycat .dot{display:inline-block}
+#filters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px}
+#filters[hidden]{display:none}
+.chip{display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--side-text);border:1px solid color-mix(in srgb,var(--side-text) 35%,transparent);border-radius:14px;padding:5px 11px;font:600 12px var(--body-font);cursor:pointer}
+.chip:hover{background:color-mix(in srgb,var(--side-text) 12%,transparent)}
+.chip.on{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+.chip.on .dot{box-shadow:0 0 0 2px var(--accent-text)}
+.am-label{font:600 13px var(--body-font);color:#1a1a1a;border:0;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.pin{border:3px solid #fff;border-radius:50%;box-sizing:border-box}
+.pin.prop{width:30px;height:30px;border-width:4px;background:var(--prop);box-shadow:0 0 8px rgba(0,0,0,.35)}
+.pin.amen{width:20px;height:20px;background:var(--amen);box-shadow:0 0 4px rgba(0,0,0,.3)}
+
+/* Data loader */
+#loader{position:fixed;inset:0;background:rgba(0,40,28,.6);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;box-sizing:border-box;font-family:"Segoe UI",Arial,sans-serif}
+#loader.hide{display:none}
+.panel{background:#fff;color:#1a1a1a;border-radius:12px;max-width:540px;width:100%;padding:24px;box-sizing:border-box;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.panel h3{margin:0 0 6px;color:var(--ui);font-size:20px}
+.panel p{margin:0;font-size:14px;color:#444}
+#drop{border:2px dashed #79C98A;border-radius:10px;padding:22px;text-align:center;cursor:pointer;color:#2c5446;margin:14px 0;font-size:14px}
+#drop.over,#drop:hover{background:#eef8f1}
+textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monospace;border:1px solid #c9d6cf;border-radius:8px;padding:8px;resize:vertical}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.row button{padding:9px 16px;border-radius:6px;border:0;font:600 14px "Segoe UI",Arial,sans-serif;cursor:pointer;background:var(--ui);color:#fff}
+.row button.ghost{background:#fff;color:var(--ui);border:1px solid var(--ui)}
+#msg,#cMsg{font-size:13px;margin-top:10px;color:#a33;white-space:pre-line}
+
+/* Customize drawer */
+#custom{position:fixed;top:0;right:0;bottom:0;width:320px;background:#fff;color:#1a1a1a;z-index:1500;box-shadow:-6px 0 30px rgba(0,0,0,.25);overflow-y:auto;padding:20px;box-sizing:border-box;font:14px "Segoe UI",Arial,sans-serif}
+#custom.hide{display:none}
+#custom .chead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+#custom h3{margin:0;color:var(--ui);font-size:19px}
+#cClose{border:0;background:none;font-size:26px;line-height:1;cursor:pointer;color:#555;padding:0 4px}
+.clbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5a6b64;font-weight:600;margin:18px 0 8px}
+#custom label.f{display:block;font-size:13px;color:#333;margin:10px 0 0}
+#custom input[type=text],#custom select{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:7px 8px;border:1px solid #c9d6cf;border-radius:6px;font:14px "Segoe UI",Arial,sans-serif;background:#fff}
+#presets{display:flex;flex-wrap:wrap;gap:6px}
+.preset{display:flex;align-items:center;gap:6px;border:1px solid #c9d6cf;background:#fff;border-radius:16px;padding:4px 10px 4px 4px;cursor:pointer;font:13px "Segoe UI",Arial,sans-serif}
+.preset:hover{border-color:#79C98A}
+.preset i{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #c9d6cf}
+.crow{display:flex;align-items:center;gap:10px;margin:6px 0}
+.crow input[type=color]{width:38px;height:30px;padding:0;border:1px solid #c9d6cf;border-radius:6px;background:#fff;cursor:pointer}
+.small{font-size:12px;color:#5a6b64;margin:6px 0 0}
+#custom input.other{margin-top:6px}
+#cLogoRemove{margin-top:8px;border:1px solid #c9d6cf;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font:13px "Segoe UI",Arial,sans-serif}
+
+@media (max-width:700px){
+ #wrap{flex-direction:column-reverse}
+ #side{width:100%;height:45%;min-height:260px;flex:none}
+ #map{flex:1 1 auto;min-height:320px}
+ #custom{width:100%;top:40%}
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+ <div id="side">
+  <img id="logo" alt="" hidden>
+  <h2 id="title">CBRE Amenity Explorer</h2>
+  <p class="sub"><b id="pname"></b><br><span id="paddr"></span></p>
+  <p class="sub">Click a location to see it in relation to the property.</p>
+  <div id="filters" hidden></div>
+  <div id="list"></div>
+  <div id="tools">
+   <div class="lbl">Editing tools (hidden on saved maps)</div>
+   <button id="btnSave">Save shareable map (.html)</button>
+   <button id="btnCustom" class="ghost">Customize look</button>
+   <button id="btnCsv" class="ghost">Download CSV</button>
+   <button id="btnLoad" class="ghost">Load different data</button>
+   <div id="note"></div>
+  </div>
+ </div>
+ <div id="map"></div>
+</div>
+
+<div id="loader" class="hide">
+ <div class="panel">
+  <h3>Load amenity data</h3>
+  <p>Drop in the CSV from the Amenity Explorer agent, or paste its text below.</p>
+  <div id="drop">Drop a .csv file here, or click to choose one</div>
+  <input type="file" id="file" accept=".csv,text/csv" hidden>
+  <textarea id="paste" placeholder="Name,Category,Address,Latitude,Longitude,Website&#10;&quot;Property Name&quot;,Subject Property,&quot;Address&quot;,37.789800,-122.396800,"></textarea>
+  <div id="msg"></div>
+  <div class="row"><button class="ghost" id="btnCancel">Cancel</button><button id="btnPaste">Load pasted data</button></div>
+ </div>
+</div>
+
+<div id="custom" class="hide">
+ <div class="chead"><h3>Customize look</h3><button id="cClose" aria-label="Close">&times;</button></div>
+ <label class="f">Title<input type="text" id="cTitle"></label>
+
+ <div class="clbl">Color presets</div>
+ <div id="presets"></div>
+
+ <div class="clbl">Colors</div>
+ <div class="crow"><input type="color" id="cSideBg"><span>Sidebar background</span></div>
+ <div class="crow"><input type="color" id="cSideText"><span>Sidebar text</span></div>
+ <div class="crow"><input type="color" id="cAccent"><span>Accent (headings &amp; buttons)</span></div>
+ <div class="crow"><input type="color" id="cProp"><span>Property pin &amp; label</span></div>
+ <div class="crow"><input type="color" id="cAmen"><span>Amenity pins (single color)</span></div>
+
+ <div class="clbl">Pin colors</div>
+ <label class="crow"><input type="checkbox" id="cByCat"><span>Color pins by category</span></label>
+ <div id="catColors"></div>
+ <p class="small" id="catHint">Colors are assigned automatically. Click a swatch to change one.</p>
+
+ <div class="clbl">Fonts</div>
+ <label class="f">Headings<select id="cHead"></select></label>
+ <input type="text" id="cHeadOther" class="other" placeholder="Exact name, e.g. Poppins" hidden>
+ <label class="f">Body text<select id="cBody"></select></label>
+ <input type="text" id="cBodyOther" class="other" placeholder="Exact name, e.g. Poppins" hidden>
+ <p class="small">For any other font, pick "Other Google Font…", find one at <a href="https://fonts.google.com" target="_blank" rel="noopener">fonts.google.com</a>, and type its name exactly as shown there (capitals count). Web fonts download from Google when the map opens; the others use fonts already on the viewer's computer.</p>
+
+ <div class="clbl">Sidebar</div>
+ <label class="crow"><input type="checkbox" id="cIcons"><span>Show category icons (☕ 🍽️ 🏨 …)</span></label>
+ <label class="crow"><input type="checkbox" id="cCollapsed"><span>Start with category lists collapsed</span></label>
+
+ <div class="clbl">Map</div>
+ <label class="f">Map style<select id="cMap">
+  <option value="liberty">Detailed streets</option>
+  <option value="positron">Clean light gray</option>
+  <option value="bright">Bright</option>
+ </select></label>
+
+ <div class="clbl">Logo (optional)</div>
+ <input type="file" id="cLogo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+ <button id="cLogoRemove" hidden>Remove logo</button>
+ <p class="small">PNG or SVG with a transparent background works best. Max 800 KB.</p>
+
+ <div id="cMsg"></div>
+ <div class="row"><button class="ghost" id="cReset">Reset colors &amp; fonts</button><button id="cDone">Done</button></div>
+</div>
+
+<!-- Saved data and look live here. Filled in automatically by "Save shareable map". -->
+<script id="csv-data" type="text/csv" data-mode="edit"></script>
+<script id="settings-data" type="application/json"></script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
+<script>
+// Categories come straight from the CSV (any names, in CSV order). Icons match common names; anything else gets 📍.
+var ICONS = {"coffee":"☕","cafe":"☕","cafes":"☕","café":"☕","cafés":"☕","coffee shops":"☕",
+ "restaurants":"🍽️","restaurant":"🍽️","dining":"🍽️","food":"🍽️","food & drink":"🍽️",
+ "hotels":"🏨","hotel":"🏨","lodging":"🏨","retail":"🛍️","shopping":"🛍️","shops":"🛍️",
+ "fitness":"💪","gym":"💪","gyms":"💪","wellness":"🧘","attractions":"⭐","entertainment":"🎭","arts & culture":"🎭",
+ "parks":"🌳","park":"🌳","open space":"🌳","grocery":"🛒","groceries":"🛒","transit":"🚆","transportation":"🚆",
+ "parking":"🅿️","banks":"🏦","bank":"🏦","bars":"🍸","nightlife":"🍸","healthcare":"🏥","medical":"🏥",
+ "education":"🎓","schools":"🎓","childcare":"🧸","life science":"🔬","life sciences":"🔬","biotech":"🔬",
+ "tech":"💻","technology":"💻","offices":"🏢","office":"🏢","corporate neighbors":"🏢"};
+// Default category pin colors, used in order. Change any of them in Customize look.
+var PALETTE = ["#E4572E","#2E86AB","#F2B33D","#8E5BA8","#3BAA6E","#D64F8A","#1B9AAA","#8C6D46","#F28C28","#5C6BC0"];
+
+/* ---------- Look & feel options ---------- */
+var DEFAULTS = {title:"CBRE Amenity Explorer",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#79C98A",prop:"#003F2D",amen:"#79C98A",
+ headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},startCollapsed:false};
+var PRESETS = {
+ "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#79C98A",prop:"#003F2D",amen:"#79C98A"},
+ "Light":     {sideBg:"#F4F6F5",sideText:"#003F2D",accent:"#1F7A5A",prop:"#003F2D",amen:"#2FA36B"},
+ "Charcoal":  {sideBg:"#2B2B2B",sideText:"#FFFFFF",accent:"#80BBAD",prop:"#1A1A1A",amen:"#80BBAD"},
+ "Navy":      {sideBg:"#12284C",sideText:"#FFFFFF",accent:"#F2B33D",prop:"#12284C",amen:"#F2B33D"}
+};
+var FONTS = [
+ {name:"Segoe UI",css:'"Segoe UI",Arial,sans-serif'},
+ {name:"Arial",css:'Arial,Helvetica,sans-serif'},
+ {name:"Calibri",css:'Calibri,Carlito,Arial,sans-serif'},
+ {name:"Verdana",css:'Verdana,Geneva,sans-serif'},
+ {name:"Trebuchet MS",css:'"Trebuchet MS",Arial,sans-serif'},
+ {name:"Georgia",css:'Georgia,"Times New Roman",serif'},
+ {name:"Inter",css:'"Inter",Arial,sans-serif',web:true},
+ {name:"Montserrat",css:'"Montserrat",Arial,sans-serif',web:true},
+ {name:"Lato",css:'"Lato",Arial,sans-serif',web:true},
+ {name:"Playfair Display",css:'"Playfair Display",Georgia,serif',web:true},
+ {name:"Source Serif 4",css:'"Source Serif 4",Georgia,serif',web:true}
+];
+
+var PRISTINE="<!DOCTYPE html>\n"+document.documentElement.outerHTML; // clean copy of this file, used by "Save shareable map"
+var $ = function(id){return document.getElementById(id);};
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+
+var S = (function(){
+ var s={},k,saved={};
+ try{saved=JSON.parse($("settings-data").textContent||"{}")||{};}catch(e){}
+ for(k in DEFAULTS) s[k]=(saved[k]!=null?saved[k]:DEFAULTS[k]);
+ return s;
+})();
+
+function cleanFont(n){return String(n||"").replace(/[^A-Za-z0-9 ]/g,"").replace(/\s+/g," ").trim();}
+function isListed(name){for(var i=0;i<FONTS.length;i++)if(FONTS[i].name==name)return true;return false;}
+function font(name){
+ for(var i=0;i<FONTS.length;i++)if(FONTS[i].name==name)return FONTS[i];
+ name=cleanFont(name);if(!name)return FONTS[0];
+ return {name:name,css:'"'+name+'",Arial,sans-serif',web:true}; // any Google Font typed by name
+}
+function loadWebFont(f){
+ if(!f.web||document.getElementById("gf-"+f.name))return;
+ var base="https://fonts.googleapis.com/css2?family="+f.name.replace(/ /g,"+");
+ var l=document.createElement("link");l.id="gf-"+f.name;l.rel="stylesheet";
+ l.onload=function(){if(/Google Fonts/.test($("cMsg").textContent))$("cMsg").textContent="";};
+ l.onerror=function(){ // some fonts only come in one weight: retry with the plain request
+  l.onerror=function(){l.remove();$("cMsg").textContent='Couldn\'t find "'+f.name+'" on Google Fonts. Check the spelling at fonts.google.com (capital letters matter).';};
+  l.href=base+"&display=swap";
+ };
+ l.href=base+":wght@400;600;700&display=swap";
+ document.head.appendChild(l);
+}
+function catKey(c){return String(c||"").trim().toLowerCase()||"other";}
+function catLabel(c){return (S.showIcons?(ICONS[catKey(c)]||"📍")+" ":"")+(c||"Other");}
+var CATS=[]; // [{key,label}] for the loaded data, in CSV order
+function catColor(i){var c=CATS[i];return (c&&S.catColors[c.key])||PALETTE[i%PALETTE.length];}
+function textOn(hex){
+ var n=parseInt(String(hex).replace("#",""),16);if(isNaN(n))return "#FFFFFF";
+ var r=n>>16&255,g=n>>8&255,b=n&255;
+ return (0.2126*r+0.7152*g+0.0722*b)/255>0.6?"#1A1A1A":"#FFFFFF";
+}
+function applyLook(){
+ var st=document.documentElement.style;
+ st.setProperty("--side-bg",S.sideBg);st.setProperty("--side-text",S.sideText);
+ st.setProperty("--accent",S.accent);st.setProperty("--accent-text",textOn(S.accent));
+ st.setProperty("--prop",S.prop);st.setProperty("--prop-text",textOn(S.prop));
+ st.setProperty("--amen",S.amen);
+ var hf=font(S.headFont),bf=font(S.bodyFont);loadWebFont(hf);loadWebFont(bf);
+ st.setProperty("--head-font",hf.css);st.setProperty("--body-font",bf.css);
+ $("title").textContent=S.title||DEFAULTS.title;
+ var heads=document.querySelectorAll("[data-cat]");for(var i=0;i<heads.length;i++)heads[i].textContent=catLabel(heads[i].getAttribute("data-cat"));
+ for(var j=0;j<CATS.length;j++){if(S.colorByCat)st.setProperty("--cat-"+j,catColor(j));else st.removeProperty("--cat-"+j);}
+ document.body.classList.toggle("bycat",!!S.colorByCat);
+ if(S.logo){$("logo").src=S.logo;$("logo").hidden=false;$("cLogoRemove").hidden=false;}
+ else{$("logo").removeAttribute("src");$("logo").hidden=true;$("cLogoRemove").hidden=true;}
+ setMapStyle(S.mapStyle);
+}
+
+/* ---------- CSV ---------- */
+function parseRows(text){
+ var rows=[],row=[],f="",q=false;
+ for(var i=0;i<text.length;i++){
+  var ch=text[i];
+  if(q){ if(ch=='"'){ if(text[i+1]=='"'){f+='"';i++;} else q=false; } else f+=ch; }
+  else if(ch=='"') q=true;
+  else if(ch==","){row.push(f);f="";}
+  else if(ch=="\n"||ch=="\r"){ if(ch=="\r"&&text[i+1]=="\n")i++; row.push(f);rows.push(row);row=[];f=""; }
+  else f+=ch;
+ }
+ row.push(f);rows.push(row);
+ return rows;
+}
+function readData(text){
+ text=text.replace(/^\uFEFF/,"").trim();
+ if(!text) return {error:"No data found."};
+ var rows=parseRows(text);
+ var head=rows.shift().map(function(h){return h.trim().toLowerCase();});
+ function col(names){for(var i=0;i<names.length;i++){var k=head.indexOf(names[i]);if(k>=0)return k;}return -1;}
+ var c={name:col(["name"]),cat:col(["category"]),addr:col(["address"]),lat:col(["latitude","lat"]),lng:col(["longitude","lng","lon","long"]),web:col(["website","url"])};
+ if(c.name<0||c.lat<0||c.lng<0) return {error:"The CSV needs Name, Latitude and Longitude columns.\nThe header row should be: Name,Category,Address,Latitude,Longitude,Website"};
+ var items=[],skipped=[];
+ rows.forEach(function(r,i){
+  if(!r.join("").trim()) return;
+  var g=function(k){return k<0?"":(r[k]||"").trim();};
+  var o={name:g(c.name),category:g(c.cat),address:g(c.addr),lat:parseFloat(g(c.lat)),lng:parseFloat(g(c.lng)),website:g(c.web)};
+  if(isNaN(o.lat)||isNaN(o.lng)||Math.abs(o.lat)>90||Math.abs(o.lng)>180){skipped.push((o.name||"Row "+(i+2))+" (missing or invalid coordinates)");return;}
+  items.push(o);
+ });
+ var prop=items.filter(function(o){return o.category.toLowerCase()=="subject property";})[0];
+ if(!prop) return {error:'No row with Category "Subject Property" was found.\nAdd the property itself as a row with that exact category.'};
+ return {text:text,property:prop,amenities:items.filter(function(o){return o!==prop;}),skipped:skipped};
+}
+
+/* ---------- Map ---------- */
+function walkMin(a,b){
+ var r=Math.PI/180,dLat=(b[0]-a[0])*r,dLng=(b[1]-a[1])*r;
+ var h=Math.pow(Math.sin(dLat/2),2)+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.pow(Math.sin(dLng/2),2);
+ var meters=2*6371000*Math.asin(Math.sqrt(h))*1.3; // 1.3 = street-grid detour factor
+ return Math.max(1,Math.round(meters/80));          // ~80 m per minute walking
+}
+var map=L.map("map",{maxZoom:18}).setView([39.5,-98.35],4);
+var gl=null,currentStyle=null;
+function styleUrl(s){return "https://tiles.openfreemap.org/styles/"+s;}
+function hasWebGL(){try{var c=document.createElement("canvas");return !!(c.getContext("webgl2")||c.getContext("webgl"));}catch(e){return false;}}
+if(L.maplibreGL&&hasWebGL()){
+ currentStyle=S.mapStyle;
+ gl=L.maplibreGL({style:styleUrl(currentStyle),
+  attribution:'<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+ }).addTo(map);
+}else{
+ L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{
+  attribution:"Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, NGA, EPA, USDA, NPS, &copy; OpenStreetMap contributors"
+ }).addTo(map);
+}
+function setMapStyle(s){
+ if(!gl||s===currentStyle)return;
+ try{gl.getMaplibreMap().setStyle(styleUrl(s));currentStyle=s;}catch(e){}
+}
+// Redraw the map whenever its box changes size (embeds like Vev resize after load)
+if(window.ResizeObserver)new ResizeObserver(function(){map.invalidateSize();}).observe($("map"));
+window.addEventListener("load",function(){map.invalidateSize();});
+var layer=L.layerGroup().addTo(map);
+var propIcon=L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-15],html:'<div class="pin prop"></div>'});
+function amIcon(i){return L.divIcon({className:"",iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-10],html:'<div class="pin amen" style="background:var(--cat-'+i+',var(--amen))"></div>'});}
+function link(u){if(!u)return "";if(!/^https?:\/\//i.test(u))u="https://"+u;return '<br><a href="'+esc(u)+'" target="_blank" rel="noopener">Website</a>';}
+
+var DATA=null;
+function render(d){
+ DATA=d;layer.clearLayers();
+ var list=$("list");list.innerHTML="";
+ var P=[d.property.lat,d.property.lng],active=null,bounds=[P];
+ $("pname").textContent=d.property.name;
+ $("paddr").textContent=d.property.address;
+ document.title=d.property.name+" – Amenity Explorer";
+ L.marker(P,{icon:propIcon,zIndexOffset:1000}).addTo(layer)
+  .bindPopup("<b>"+esc(d.property.name)+"</b><br>"+esc(d.property.address))
+  .bindTooltip(esc(d.property.name),{permanent:true,direction:"top",offset:[0,-16],className:"prop-label"});
+ d.amenities.forEach(function(a){a.walk=walkMin(P,[a.lat,a.lng]);});
+ CATS=[];GROUPS=[];var seen={};
+ d.amenities.forEach(function(a){var k=catKey(a.category);if(!seen[k]){seen[k]=true;CATS.push({key:k,label:(a.category||"").trim()||"Other"});}});
+
+ // Filter chips: "All" + one per category (isolate a category on the map)
+ var chips=$("filters");chips.innerHTML="";chips.hidden=CATS.length<2;
+ function chip(label,ci){
+  var b=document.createElement("button");b.type="button";b.className="chip";
+  if(ci==null)b.textContent=label;
+  else{b.innerHTML='<span class="dot" style="background:var(--cat-'+ci+',var(--amen))"></span><span class="name"></span>';
+   b.lastChild.setAttribute("data-cat",label);b.lastChild.textContent=catLabel(label);}
+  b.onclick=function(){isolate(ci==null?null:ci);};chips.appendChild(b);return b;
+ }
+ chip("All",null);
+
+ CATS.forEach(function(c,ci){
+  var items=d.amenities.filter(function(a){return catKey(a.category)===c.key;}).sort(function(x,y){return x.walk-y.walk;});
+  var g={key:c.key,el:document.createElement("div"),layer:L.layerGroup().addTo(layer),bounds:[P],chip:chip(c.label,ci)};
+  g.el.className="group"+(S.startCollapsed?" collapsed":"");
+  var head=document.createElement("button");head.type="button";head.className="cat";head.setAttribute("aria-expanded",!S.startCollapsed);
+  head.innerHTML='<span class="dot" style="background:var(--cat-'+ci+',var(--amen))"></span><span class="name"></span><span class="count">'+items.length+'</span><span class="chev"></span>';
+  head.children[1].setAttribute("data-cat",c.label);head.children[1].textContent=catLabel(c.label);
+  head.onclick=function(){setOpen(g,g.el.classList.contains("collapsed"));};
+  var box=document.createElement("div");box.className="items";
+  g.el.appendChild(head);g.el.appendChild(box);list.appendChild(g.el);GROUPS.push(g);
+  items.forEach(function(a){
+   var pop=L.popup({autoPan:false,offset:[0,-8]}).setLatLng([a.lat,a.lng])
+    .setContent("<b>"+esc(a.name)+"</b><br>"+esc(a.address)+"<br>~"+a.walk+" min walk (est.)"+link(a.website));
+   var m=L.marker([a.lat,a.lng],{icon:amIcon(ci)}).addTo(g.layer)
+    .bindTooltip(esc(a.name),{direction:"top",offset:[0,-10],className:"am-label"}); // hover: name only
+   var card=document.createElement("div");card.className="card";
+   card.textContent=a.name;
+   function select(){ // click (pin or list): zoom to show property + place, then open details
+    if(active)active.classList.remove("active");card.classList.add("active");active=card;
+    setOpen(g,true);
+    if(card.scrollIntoView)card.scrollIntoView({block:"nearest",behavior:"smooth"});
+    m.closeTooltip();
+    map.fitBounds([P,[a.lat,a.lng]],{paddingTopLeft:[60,150],paddingBottomRight:[60,60],maxZoom:17});
+    pop.openOn(map);
+   }
+   card.onclick=select;m.on("click",select);
+   box.appendChild(card);bounds.push([a.lat,a.lng]);g.bounds.push([a.lat,a.lng]);
+  });
+ });
+ ALL_BOUNDS=bounds;
+ isolate(null,true);
+ applyLook();if(!$("custom").classList.contains("hide"))fillPanel();
+ $("note").textContent=d.amenities.length+" amenities loaded."+(d.skipped.length?"\nSkipped (fix in the CSV): "+d.skipped.join("; "):"");
+}
+
+var GROUPS=[],ALL_BOUNDS=[];
+function setOpen(g,open){g.el.classList.toggle("collapsed",!open);g.el.firstChild.setAttribute("aria-expanded",open);}
+// Show one category (index) or all (null) on the map and in the list, then zoom to fit it with the property
+function isolate(ci,initial){
+ map.closePopup();
+ GROUPS.forEach(function(g,i){
+  var show=(ci==null||ci===i);
+  if(show&&!layer.hasLayer(g.layer))layer.addLayer(g.layer);
+  if(!show&&layer.hasLayer(g.layer))layer.removeLayer(g.layer);
+  g.el.hidden=!show;g.chip.classList.toggle("on",ci===i);
+  if(ci===i)setOpen(g,true);
+ });
+ var all=$("filters").firstChild;if(all)all.classList.toggle("on",ci==null);
+ var b=ci==null?ALL_BOUNDS:GROUPS[ci].bounds;
+ if(b.length>1)map.fitBounds(b,{padding:[40,40],maxZoom:17});else if(b.length)map.setView(b[0],16);
+ if(!initial&&$("side").scrollTo)$("side").scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ---------- Loading data ---------- */
+function loadText(text){
+ var d=readData(text);
+ if(d.error){$("msg").textContent=d.error;showLoader();return false;}
+ render(d);
+ $("loader").classList.add("hide");$("msg").textContent="";$("paste").value="";
+ document.body.classList.remove("view");
+ return true;
+}
+function loadFile(f){
+ var r=new FileReader();
+ r.onload=function(){
+  if(r.result.indexOf("\uFFFD")>=0){ // not UTF-8 (e.g. Excel "CSV" instead of "CSV UTF-8")
+   var r2=new FileReader();r2.onload=function(){loadText(r2.result);};r2.readAsText(f,"windows-1252");
+  } else loadText(r.result);
+ };
+ r.readAsText(f,"utf-8");
+}
+function showLoader(){$("loader").classList.remove("hide");$("btnCancel").style.display=DATA?"":"none";}
+
+$("drop").onclick=function(){$("file").click();};
+$("file").onchange=function(){if(this.files[0])loadFile(this.files[0]);this.value="";};
+$("btnPaste").onclick=function(){loadText($("paste").value);};
+$("btnCancel").onclick=function(){$("loader").classList.add("hide");$("msg").textContent="";};
+$("btnLoad").onclick=showLoader;
+window.addEventListener("dragover",function(e){e.preventDefault();$("drop").classList.add("over");});
+window.addEventListener("dragleave",function(){$("drop").classList.remove("over");});
+window.addEventListener("drop",function(e){
+ e.preventDefault();$("drop").classList.remove("over");
+ var f=e.dataTransfer.files[0];if(!f)return;
+ if(/^image\//.test(f.type)&&!$("custom").classList.contains("hide"))loadLogo(f);else loadFile(f);
+});
+
+/* ---------- Customize panel ---------- */
+var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"prop",cAmen:"amen"};
+(function buildPanel(){
+ ["cHead","cBody"].forEach(function(id){
+  FONTS.forEach(function(f){var o=document.createElement("option");o.value=f.name;o.textContent=f.name+(f.web?" (web font)":"");$(id).appendChild(o);});
+  var o=document.createElement("option");o.value="__other";o.textContent="Other Google Font…";$(id).appendChild(o);
+ });
+ Object.keys(PRESETS).forEach(function(name){
+  var p=PRESETS[name],b=document.createElement("button");b.className="preset";b.type="button";
+  b.innerHTML='<i style="background:'+p.sideBg+'"></i><i style="background:'+p.amen+'"></i>'+esc(name);
+  b.onclick=function(){for(var k in p)S[k]=p[k];fillPanel();applyLook();};
+  $("presets").appendChild(b);
+ });
+ Object.keys(COLOR_FIELDS).forEach(function(id){$(id).addEventListener("input",function(){S[COLOR_FIELDS[id]]=this.value.toUpperCase();applyLook();});});
+ $("cTitle").addEventListener("input",function(){S.title=this.value;applyLook();});
+ [["cHead","headFont"],["cBody","bodyFont"]].forEach(function(p){
+  var sel=$(p[0]),box=$(p[0]+"Other"),t=null;
+  function useTyped(){var n=cleanFont(box.value);if(n){S[p[1]]=n;applyLook();}}
+  sel.onchange=function(){
+   if(this.value=="__other"){box.hidden=false;box.focus();useTyped();}
+   else{box.hidden=true;S[p[1]]=this.value;applyLook();}
+  };
+  box.addEventListener("input",function(){clearTimeout(t);t=setTimeout(useTyped,700);});
+  box.addEventListener("change",function(){clearTimeout(t);useTyped();});
+ });
+ $("cMap").onchange=function(){S.mapStyle=this.value;applyLook();};
+ $("cIcons").onchange=function(){S.showIcons=this.checked;applyLook();};
+ $("cCollapsed").onchange=function(){S.startCollapsed=this.checked;GROUPS.forEach(function(g){setOpen(g,!S.startCollapsed);});};
+ $("cByCat").onchange=function(){S.colorByCat=this.checked;fillPanel();applyLook();};
+ $("cLogo").onchange=function(){if(this.files[0])loadLogo(this.files[0]);this.value="";};
+ $("cLogoRemove").onclick=function(){S.logo="";applyLook();};
+ $("cReset").onclick=function(){["sideBg","sideText","accent","prop","amen","headFont","bodyFont","mapStyle","colorByCat"].forEach(function(k){S[k]=DEFAULTS[k];});S.catColors={};fillPanel();applyLook();};
+ $("cDone").onclick=$("cClose").onclick=function(){$("custom").classList.add("hide");$("cMsg").textContent="";};
+ $("btnCustom").onclick=function(){fillPanel();$("custom").classList.remove("hide");};
+ if(!gl){$("cMap").disabled=true;$("cMap").title="Map styles need WebGL; this browser is using the backup map.";}
+})();
+function fillPanel(){
+ for(var id in COLOR_FIELDS)$(id).value=S[COLOR_FIELDS[id]];
+ $("cTitle").value=S.title;[["cHead","headFont"],["cBody","bodyFont"]].forEach(function(p){
+  var listed=isListed(S[p[1]]);$(p[0]).value=listed?S[p[1]]:"__other";
+  $(p[0]+"Other").hidden=listed;$(p[0]+"Other").value=listed?"":S[p[1]];
+ });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cCollapsed").checked=!!S.startCollapsed;
+ $("cByCat").checked=!!S.colorByCat;$("catColors").innerHTML="";$("catColors").hidden=$("catHint").hidden=!S.colorByCat;
+ CATS.forEach(function(c,i){
+  var row=document.createElement("div");row.className="crow";
+  var inp=document.createElement("input");inp.type="color";inp.value=catColor(i);
+  inp.addEventListener("input",function(){S.catColors[c.key]=this.value.toUpperCase();applyLook();});
+  var lab=document.createElement("span");lab.textContent=c.label;
+  row.appendChild(inp);row.appendChild(lab);$("catColors").appendChild(row);
+ });
+}
+function loadLogo(f){
+ if(f.size>800*1024){$("cMsg").textContent="That image is over 800 KB. Please use a smaller PNG or SVG.";return;}
+ var r=new FileReader();
+ r.onload=function(){S.logo=r.result;$("cMsg").textContent="";applyLook();};
+ r.readAsDataURL(f);
+}
+
+/* ---------- Saving ---------- */
+function fileBase(){return DATA.property.name.replace(/[^\w]+/g,"_").replace(/^_|_$/g,"")||"Property";}
+function download(content,type,name){
+ var a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([content],{type:type}));
+ a.download=name;document.body.appendChild(a);a.click();a.remove();
+}
+$("btnCsv").onclick=function(){download("\uFEFF"+DATA.text.replace(/\r?\n/g,"\r\n"),"text/csv;charset=utf-8",fileBase()+"_Amenities.csv");};
+$("btnSave").onclick=function(){
+ var dataTag='<script id="csv-data" type="text/csv" data-mode="view">\n'+DATA.text.replace(/<\//g,"<\\/")+'\n<\/script>';
+ var lookTag='<script id="settings-data" type="application/json">'+JSON.stringify(S).replace(/</g,"\\u003c")+'<\/script>';
+ var html=PRISTINE
+  .replace(/<script id="csv-data"[^>]*>[\s\S]*?<\/script>/,function(){return dataTag;})
+  .replace(/<script id="settings-data"[^>]*>[\s\S]*?<\/script>/,function(){return lookTag;})
+  .replace(/<title>[\s\S]*?<\/title>/,function(){return "<title>"+esc(DATA.property.name)+" – Amenity Explorer<\/title>";});
+ download(html,"text/html;charset=utf-8",fileBase()+"_Amenity_Explorer.html");
+};
+
+/* ---------- Start ---------- */
+applyLook();
+(function init(){
+ var el=$("csv-data"),text=el.textContent.replace(/<\\\//g,"</").trim();
+ var view=el.getAttribute("data-mode")=="view"&&location.hash!="#edit";
+ if(text&&loadText(text)){if(view)document.body.classList.add("view");}
+ else showLoader();
+})();
+</script>
+</body>
+</html>
