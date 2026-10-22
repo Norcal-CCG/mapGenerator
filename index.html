@@ -64,6 +64,23 @@ body.bycat .dot{display:inline-block}
 #stepProp select{margin-top:14px}
 .mf{display:block;font-size:13px;color:#333;margin-top:10px}
 .mrow{display:flex;gap:10px}.mrow .mf{flex:1}
+#editor{position:fixed;inset:0;background:rgba(0,40,28,.6);display:flex;align-items:center;justify-content:center;z-index:2100;padding:16px;box-sizing:border-box;font-family:"Segoe UI",Arial,sans-serif}
+#editor.hide{display:none}
+.epanel{background:#fff;color:#1a1a1a;border-radius:12px;width:100%;max-width:1180px;max-height:calc(100vh - 32px);display:flex;flex-direction:column;padding:22px;box-sizing:border-box;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.epanel h3{margin:0 0 4px;color:var(--ui);font-size:20px}
+.epanel .hint{margin:0 0 12px}
+.ewrap{overflow:auto;flex:1;min-height:120px;border:1px solid #dfe7e3;border-radius:8px}
+#etable{border-collapse:collapse;width:100%;min-width:900px;font-size:13px}
+#etable th{position:sticky;top:0;background:#eef3f0;text-align:left;font-weight:600;color:#33453e;padding:8px 6px;z-index:1}
+#etable td{padding:3px 4px;border-top:1px solid #edf1ef}
+#etable input{width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;padding:6px;font:13px "Segoe UI",Arial,sans-serif;background:transparent}
+#etable input:hover{border-color:#d3ddd8}#etable input:focus{border-color:#79C98A;outline:none;background:#fff}
+#etable input.bad{border-color:#c0392b;background:#fdf0ee}
+#etable tr.prop td{background:#f3f8f5}
+#etable .ptag{font-size:12px;font-weight:600;color:var(--ui);padding:0 6px;white-space:nowrap}
+#etable th:nth-child(1){width:21%}#etable th:nth-child(2){width:13%}#etable th:nth-child(3){width:26%}#etable th:nth-child(4),#etable th:nth-child(5){width:10%}#etable th:nth-child(6){width:17%}#etable th:nth-child(7){width:34px}
+.del{border:0;background:none;color:#8a2a1f;font-size:18px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:4px}.del:hover{background:#fbe9e7}
+#emsg{font-size:13px;margin-top:10px;color:#a33}
 #msg2{font-size:13px;margin-top:10px;color:#a33;white-space:pre-line}
 .panel h3{margin:0 0 6px;color:var(--ui);font-size:20px}
 .panel p{margin:0;font-size:14px;color:#444}
@@ -114,6 +131,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
   <div id="tools">
    <div class="lbl">Editing tools (hidden on saved maps)</div>
    <button id="btnSave">Save shareable map (.html)</button>
+   <button id="btnEdit" class="ghost">Edit data</button>
    <button id="btnCustom" class="ghost">Customize look</button>
    <button id="btnCsv" class="ghost">Download CSV</button>
    <button id="btnBam" class="ghost">Download CSV for BAM 2.0</button>
@@ -146,8 +164,9 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 
   <div id="stepProp" hidden>
    <h3>Which one is your property?</h3>
-   <p>This file doesn't mark a main property. Pick it from the list, or enter it yourself.</p>
+   <p>This file doesn't mark a main property (BAM exports usually don't). Pick it from the list, or enter it yourself.</p>
    <select id="propPick"></select>
+   <label class="mf" id="pickNameWrap">Property name (as it should appear on the map)<input type="text" id="pickName" placeholder="e.g. 384 Post"></label>
    <div id="propManual" hidden>
     <label class="mf">Property name<input type="text" id="mName"></label>
     <label class="mf">Address<input type="text" id="mAddr"></label>
@@ -157,6 +176,20 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
    <div id="msg2"></div>
    <div class="row"><button class="ghost" id="btnPropBack">Back</button><button id="btnPropUse">Make the map</button></div>
   </div>
+ </div>
+</div>
+
+<div id="editor" class="hide">
+ <div class="epanel">
+  <h3>Edit data</h3>
+  <p class="hint">Change any cell, add or remove places, then click <b>Apply changes</b>. For a new place, copy its latitude/longitude from Google Maps (right-click the spot), or type rough numbers and drag the pin into place afterward.</p>
+  <div class="ewrap"><table id="etable">
+   <thead><tr><th>Name</th><th>Category</th><th>Address</th><th>Latitude</th><th>Longitude</th><th>Website</th><th></th></tr></thead>
+   <tbody></tbody>
+  </table></div>
+  <datalist id="catList"></datalist>
+  <div id="emsg"></div>
+  <div class="row"><button class="ghost" id="eAdd" style="margin-right:auto">+ Add a place</button><button class="ghost" id="eCancel">Cancel</button><button id="eApply">Apply changes</button></div>
  </div>
 </div>
 
@@ -427,16 +460,18 @@ function amIcon(i){return L.divIcon({className:"",iconSize:[20,20],iconAnchor:[1
 function link(u){if(!u)return "";if(!/^https?:\/\//i.test(u))u="https://"+u;return '<br><a href="'+esc(u)+'" target="_blank" rel="noopener">Website</a>';}
 
 var DATA=null;
-function render(d){
- DATA=d;layer.clearLayers();
+function render(d,keepView){
+ DATA=d;layer.clearLayers();PINS=[];
+ var editing=!document.body.classList.contains("view");
  var list=$("list");list.innerHTML="";
  var P=[d.property.lat,d.property.lng],active=null,bounds=[P];
  $("pname").textContent=d.property.name;
  $("paddr").textContent=d.property.address;
  document.title=d.property.name+" – Amenity Map";
- L.marker(P,{icon:propIcon,zIndexOffset:1000}).addTo(layer)
+ var pm=L.marker(P,{icon:propIcon,zIndexOffset:1000,draggable:editing}).addTo(layer)
   .bindPopup("<b>"+esc(d.property.name)+"</b><br>"+esc(d.property.address))
   .bindTooltip(esc(d.property.name),{permanent:true,direction:"top",offset:[0,-16],className:"prop-label"});
+ pm.on("dragend",function(){movedTo(d.property,pm.getLatLng());});PINS.push(pm);
  d.amenities.forEach(function(a){a.walk=walkMin(P,[a.lat,a.lng]);});
  CATS=[];GROUPS=[];var seen={};
  FLAT=d.amenities.every(function(a){return !(a.category||"").trim();}); // no categories: plain list, no headings
@@ -467,10 +502,10 @@ function render(d){
   items.forEach(function(a){
    var pop=L.popup({autoPan:false,offset:[0,-8]}).setLatLng([a.lat,a.lng])
     .setContent("<b>"+esc(a.name)+"</b><br>"+esc(a.address)+"<br>~"+a.walk+" min walk (est.)"+link(a.website));
-   var m=L.marker([a.lat,a.lng],{icon:amIcon(FLAT?"none":ci)}).addTo(g.layer)
-    .bindTooltip(esc(a.name),{direction:"top",offset:[0,-10],className:"am-label"}); // hover: name only
+   var m=L.marker([a.lat,a.lng],{icon:amIcon(FLAT?"none":ci),draggable:editing}).addTo(g.layer)
+    .bindTooltip(esc(a.name||a.address||"(no name)"),{direction:"top",offset:[0,-10],className:"am-label"}); // hover: name only
    var card=document.createElement("div");card.className="card";
-   card.textContent=a.name;
+   card.textContent=a.name||a.address||"(no name)";
    function select(){ // click (pin or list): zoom to show property + place, then open details
     if(active)active.classList.remove("active");card.classList.add("active");active=card;
     setOpen(g,true);
@@ -480,19 +515,20 @@ function render(d){
     pop.openOn(map);
    }
    card.onclick=select;m.on("click",select);
+   m.on("dragend",function(){movedTo(a,m.getLatLng());});PINS.push(m);
    box.appendChild(card);bounds.push([a.lat,a.lng]);g.bounds.push([a.lat,a.lng]);
   });
  });
  ALL_BOUNDS=bounds;
- isolate(null,true);
+ isolate(null,true,keepView);
  applyLook();if(!$("custom").classList.contains("hide"))fillPanel();
- $("note").textContent=d.amenities.length+" amenities loaded."+(d.skipped.length?"\nSkipped (fix in the CSV): "+d.skipped.join("; "):"");
+ $("note").textContent=d.amenities.length+" amenities loaded. Tip: drag any pin to fix its location."+(d.skipped.length?"\nSkipped (fix in the CSV): "+d.skipped.join("; "):"");
 }
 
 var GROUPS=[],ALL_BOUNDS=[],FLAT=false;
 function setOpen(g,open){g.el.classList.toggle("collapsed",!open);g.el.firstChild.setAttribute("aria-expanded",open);}
 // Show one category (index) or all (null) on the map and in the list, then zoom to fit it with the property
-function isolate(ci,initial){
+function isolate(ci,initial,noFit){
  map.closePopup();
  GROUPS.forEach(function(g,i){
   var show=(ci==null||ci===i);
@@ -503,18 +539,80 @@ function isolate(ci,initial){
  });
  var all=$("filters").firstChild;if(all)all.classList.toggle("on",ci==null);
  var b=ci==null?ALL_BOUNDS:GROUPS[ci].bounds;
- fitTo(b);
+ if(!noFit)fitTo(b);
  if(!initial&&$("side").scrollTo)$("side").scrollTo({top:0,behavior:"smooth"});
 }
+
+var PINS=[];
+function setPinDrag(on){PINS.forEach(function(m){if(m.dragging)on?m.dragging.enable():m.dragging.disable();});}
+// A pin was dragged: save the new spot, refresh walk times and the list without moving the map
+function movedTo(o,ll){
+ o.lat=+ll.lat.toFixed(6);o.lng=+ll.lng.toFixed(6);
+ DATA.text=toStandardCSV(DATA.property,DATA.amenities);
+ render(DATA,true);
+ $("note").textContent="Moved "+o.name+". Save the map or download the CSV to keep the change.";
+}
+
+/* ---------- Edit data table ---------- */
+var EDIT_FIELDS=["name","category","address","lat","lng","website"];
+function editRow(o,isProp){
+ var tr=document.createElement("tr");if(isProp)tr.className="prop";
+ EDIT_FIELDS.forEach(function(k){
+  var td=document.createElement("td");
+  if(isProp&&k=="category"){td.innerHTML='<span class="ptag">Main property</span>';}
+  else{
+   var inp=document.createElement("input");inp.type="text";inp.setAttribute("data-k",k);
+   var v=o[k];inp.value=(v==null||(typeof v=="number"&&isNaN(v)))?"":(typeof v=="number"?v.toFixed(6):v);
+   if(k=="category")inp.setAttribute("list","catList");
+   if(k=="lat"||k=="lng")inp.inputMode="decimal";
+   inp.addEventListener("input",function(){this.classList.remove("bad");});
+   td.appendChild(inp);
+  }
+  tr.appendChild(td);
+ });
+ var td=document.createElement("td");
+ if(!isProp){var x=document.createElement("button");x.type="button";x.className="del";x.title="Remove this place";x.innerHTML="&times;";x.onclick=function(){tr.remove();};td.appendChild(x);}
+ tr.appendChild(td);
+ $("etable").tBodies[0].appendChild(tr);return tr;
+}
+function openEditor(){
+ if(!DATA)return;
+ var tb=$("etable").tBodies[0];tb.innerHTML="";$("emsg").textContent="";
+ $("catList").innerHTML="";CATS.forEach(function(c){if(c.label&&c.label!="Other"){var o=document.createElement("option");o.value=c.label;$("catList").appendChild(o);}});
+ editRow(DATA.property,true);
+ DATA.amenities.forEach(function(a){editRow(a,false);});
+ $("editor").classList.remove("hide");
+}
+$("btnEdit").onclick=openEditor;
+$("eCancel").onclick=function(){$("editor").classList.add("hide");};
+$("eAdd").onclick=function(){var tr=editRow({},false);tr.querySelector("input").focus();tr.scrollIntoView({block:"nearest"});};
+$("eApply").onclick=function(){
+ var rows=[].slice.call($("etable").tBodies[0].rows),bad=0,prop=null,list=[];
+ rows.forEach(function(tr,i){
+  var o={},inputs={};
+  [].forEach.call(tr.querySelectorAll("input[data-k]"),function(inp){o[inp.getAttribute("data-k")]=inp.value.trim();inputs[inp.getAttribute("data-k")]=inp;});
+  var isProp=i===0;
+  if(!isProp&&!EDIT_FIELDS.some(function(k){return o[k];}))return; // skip empty rows
+  var lat=parseFloat(o.lat),lng=parseFloat(o.lng);
+  if(!o.name){inputs.name.classList.add("bad");bad++;}
+  if(isNaN(lat)||Math.abs(lat)>90){inputs.lat.classList.add("bad");bad++;}
+  if(isNaN(lng)||Math.abs(lng)>180){inputs.lng.classList.add("bad");bad++;}
+  var item={name:o.name,category:isProp?"Subject Property":(o.category||""),address:o.address||"",lat:lat,lng:lng,website:o.website||""};
+  if(isProp)prop=item;else list.push(item);
+ });
+ if(bad){$("emsg").textContent="Please fix the highlighted cells: every place needs a name, and latitude/longitude must be numbers.";return;}
+ $("editor").classList.add("hide");
+ finishLoad(prop,list,[]);
+};
 
 /* ---------- Loading data ---------- */
 var PENDING=null;
 function finishLoad(prop,amenities,skipped){
  var d={property:prop,amenities:amenities,skipped:skipped||[]};
  d.text=toStandardCSV(prop,amenities);
+ document.body.classList.remove("view");
  render(d);
  $("loader").classList.add("hide");$("msg").textContent="";$("paste").value="";showStep("stepLoad");
- document.body.classList.remove("view");
  return true;
 }
 function loadText(text){
@@ -523,14 +621,18 @@ function loadText(text){
  if(d.property) return finishLoad(d.property,d.items.filter(function(o){return o!==d.property;}),d.skipped);
  // No "Subject Property" row (e.g. a BAM export): ask which one is the property
  PENDING=d;var sel=$("propPick");sel.innerHTML="";
- d.items.forEach(function(o,i){var op=document.createElement("option");op.value=i;op.textContent=o.name+(o.address?" — "+o.address:"");sel.appendChild(op);});
+ d.items.forEach(function(o,i){var op=document.createElement("option");op.value=i;op.textContent=(o.name&&o.address)?o.name+" — "+o.address:(o.name||o.address||"Unnamed place");sel.appendChild(op);});
  var op=document.createElement("option");op.value="manual";op.textContent="It's not in this file — enter it myself";sel.appendChild(op);
  sel.value="0";$("propManual").hidden=true;$("msg2").textContent="";
+ $("pickNameWrap").hidden=false;$("pickName").value=d.items[0].name||"";
  showLoader();showStep("stepProp");
  return false;
 }
 function showStep(id){$("stepLoad").hidden=id!="stepLoad";$("stepProp").hidden=id!="stepProp";}
-$("propPick").onchange=function(){$("propManual").hidden=this.value!="manual";};
+$("propPick").onchange=function(){
+ var manual=this.value=="manual";$("propManual").hidden=!manual;$("pickNameWrap").hidden=manual;
+ if(!manual&&PENDING)$("pickName").value=PENDING.items[+this.value].name||"";
+};
 $("btnPropBack").onclick=function(){PENDING=null;showStep("stepLoad");};
 $("btnPropUse").onclick=function(){
  if(!PENDING)return;var v=$("propPick").value,prop,rest;
@@ -540,7 +642,10 @@ $("btnPropUse").onclick=function(){
   prop={name:$("mName").value.trim(),category:"Subject Property",address:$("mAddr").value.trim(),lat:lat,lng:lng,website:""};
   rest=PENDING.items;
  }else{
-  prop=PENDING.items[+v];rest=PENDING.items.filter(function(o){return o!==prop;});
+  var picked=PENDING.items[+v],nm=$("pickName").value.trim();
+  if(!nm){$("msg2").textContent="Please give the property a name.";$("pickName").focus();return;}
+  rest=PENDING.items.filter(function(o){return o!==picked;});
+  prop={name:nm,category:"Subject Property",address:picked.address,lat:picked.lat,lng:picked.lng,website:picked.website};
  }
  var sk=PENDING.skipped;PENDING=null;finishLoad(prop,rest,sk);
 };
@@ -692,7 +797,7 @@ applyLook();
 (function init(){
  var el=$("csv-data"),text=el.textContent.replace(/<\\\//g,"</").trim();
  var view=el.getAttribute("data-mode")=="view"&&location.hash!="#edit";
- if(text&&loadText(text)){if(view)document.body.classList.add("view");}
+ if(text&&loadText(text)){if(view){document.body.classList.add("view");setPinDrag(false);}}
  else showLoader();
 })();
 </script>
