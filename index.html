@@ -48,7 +48,14 @@ body.bycat .dot{display:inline-block}
 .am-label{font:600 13px var(--body-font);color:#1a1a1a;border:0;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .pin{border:3px solid #fff;border-radius:50%;box-sizing:border-box}
 .pin.prop{width:30px;height:30px;border-width:4px;background:var(--prop);box-shadow:0 0 8px rgba(0,0,0,.35)}
-.pin.amen{width:20px;height:20px;background:var(--amen);box-shadow:0 0 4px rgba(0,0,0,.3)}
+.pin.amen{width:20px;height:20px;background:var(--amen);box-shadow:0 0 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;transition:width .15s,height .15s}
+.pinwrap{width:28px;height:28px;display:flex;align-items:center;justify-content:center}
+.ico,.ipv{display:inline-block;flex:none;background:currentColor;-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+.ico{width:14px;height:14px}
+body:not(.icons) .ico{display:none}
+body.icons .pin.amen.hasico{width:28px;height:28px;border-width:2px}
+.pin .ico{width:15px;height:15px}
+.chip .ico{width:13px;height:13px}
 
 /* Data loader */
 #loader{position:fixed;inset:0;background:rgba(0,40,28,.6);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;box-sizing:border-box;font-family:"Segoe UI",Arial,sans-serif}
@@ -109,6 +116,9 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 .crow input[type=color]{width:38px;height:30px;padding:0;border:1px solid #c9d6cf;border-radius:6px;background:#fff;cursor:pointer}
 .small{font-size:12px;color:#5a6b64;margin:6px 0 0}
 #custom input.other{margin-top:6px}
+.icobtn{width:32px;height:30px;border:1px solid #c9d6cf;border-radius:6px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#33453e;flex:none}
+.icobtn:hover{border-color:#79C98A}.ipv{width:18px;height:18px}
+.icoreset{margin-left:auto;border:0;background:none;color:#5a6b64;font:12px "Segoe UI",Arial,sans-serif;text-decoration:underline;cursor:pointer}
 #cLogoRemove{margin-top:8px;border:1px solid #c9d6cf;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font:13px "Segoe UI",Arial,sans-serif}
 
 @media (max-width:700px){
@@ -208,10 +218,12 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
  <div class="crow"><input type="color" id="cProp"><span>Property pin &amp; label</span></div>
  <div class="crow"><input type="color" id="cAmen"><span>Amenity pins (single color)</span></div>
 
- <div class="clbl">Pin colors</div>
+ <div class="clbl">Categories</div>
  <label class="crow"><input type="checkbox" id="cByCat"><span>Color pins by category</span></label>
+ <label class="crow"><input type="checkbox" id="cIcons"><span>Show category icons (on the map and in the list)</span></label>
  <div id="catColors"></div>
- <p class="small" id="catHint">Colors are assigned automatically. Click a swatch to change one.</p>
+ <input type="file" id="cIconFile" accept=".svg,.png,.webp,image/svg+xml,image/png,image/webp" hidden>
+ <p class="small" id="catHint">Colors and icons are assigned automatically. Click a color swatch or an icon to change it. Your own icons can be SVG or PNG; only the shape is used (PNGs need a transparent background), so they match the built-in set.</p>
 
  <div class="clbl">Fonts</div>
  <label class="f">Headings<select id="cHead"></select></label>
@@ -221,7 +233,6 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
  <p class="small">For any other font, pick "Other Google Font…", find one at <a href="https://fonts.google.com" target="_blank" rel="noopener">fonts.google.com</a>, and type its name exactly as shown there (capitals count). Web fonts download from Google when the map opens; the others use fonts already on the viewer's computer.</p>
 
  <div class="clbl">Sidebar</div>
- <label class="crow"><input type="checkbox" id="cIcons"><span>Show category icons (☕ 🍽️ 🏨 …)</span></label>
  <label class="crow"><input type="checkbox" id="cCollapsed"><span>Start with category lists collapsed</span></label>
 
  <div class="clbl">Map</div>
@@ -249,14 +260,46 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
 <script>
 // Categories come straight from the CSV (any names, in CSV order). Icons match common names; anything else gets 📍.
-var ICONS = {"coffee":"☕","cafe":"☕","cafes":"☕","café":"☕","cafés":"☕","coffee shops":"☕",
- "restaurants":"🍽️","restaurant":"🍽️","dining":"🍽️","food":"🍽️","food & drink":"🍽️",
- "hotels":"🏨","hotel":"🏨","lodging":"🏨","retail":"🛍️","shopping":"🛍️","shops":"🛍️",
- "fitness":"💪","gym":"💪","gyms":"💪","wellness":"🧘","attractions":"⭐","entertainment":"🎭","arts & culture":"🎭",
- "parks":"🌳","park":"🌳","open space":"🌳","grocery":"🛒","groceries":"🛒","transit":"🚆","transportation":"🚆",
- "parking":"🅿️","banks":"🏦","bank":"🏦","bars":"🍸","nightlife":"🍸","healthcare":"🏥","medical":"🏥",
- "education":"🎓","schools":"🎓","childcare":"🧸","life science":"🔬","life sciences":"🔬","biotech":"🔬",
- "tech":"💻","technology":"💻","offices":"🏢","office":"🏢","corporate neighbors":"🏢"};
+// Built-in single-color icons (24x24 silhouettes). The map only uses each icon's shape and fills it with one color.
+var ICON_SHAPES={
+ coffee:"M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 9h1.5a3 3 0 0 1 0 6H16v-2h1.5a1 1 0 0 0 0-2H16zM3 20h15v2H3zM7.5 2c-1 1.5 1 2.5 0 4H9c1-1.5-1-2.5 0-4zM11.5 2c-1 1.5 1 2.5 0 4H13c1-1.5-1-2.5 0-4z",
+ food:"M4.5 2H6v6h1V2h1.5v6h1V2H11v7.5c0 1.3-.9 2.4-2 2.7V22H6.5v-9.8c-1.1-.3-2-1.4-2-2.7zM17.5 2c-2 1-3 3.5-3 7v4H17v9h2.5V2z",
+ bed:"M2 5h2.5v8H21v6h-2.5v-2.5h-14V19H2zM7.5 8a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM11 8h7a3 3 0 0 1 3 3v1H11z",
+ bag:"M5.5 8h13l1 14h-15zM9 8V6a3 3 0 0 1 6 0v2h-1.6V6a1.4 1.4 0 0 0-2.8 0v2z",
+ dumbbell:"M1 10h2V8h2.5v8H3v-2H1zM6.5 6H9v12H6.5zM9 11h6v2H9zM15 6h2.5v12H15zM18.5 8H21v2h2v4h-2v2h-2.5z",
+ star:"M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z",
+ tree:"M12 2a6 6 0 0 1 6 6 6 6 0 0 1-4.75 5.87V20H17v2H7v-2h3.75v-6.13A6 6 0 0 1 6 8a6 6 0 0 1 6-6z",
+ cart:"M1 3h3.2l.8 3H22l-2.4 8.5H7.6l.5 2H19v2H6.6L3 5H1zM8 19.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM17 19.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z",
+ train:"M6 2h12a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3l2 3h-2.5L15 18H9l-1.5 3H5l2-3a3 3 0 0 1-3-3V4a2 2 0 0 1 2-2zM6.5 5v5h11V5zM8 13.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5zM16 13.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5z",
+ parking:"M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM8 6v12h2.5v-4H13a4 4 0 0 0 0-8zM10.5 8.5H13a1.5 1.5 0 0 1 0 3h-2.5z",
+ bank:"M12 2l10 5v2H2V7zM4 10h3v8H4zM10.5 10h3v8h-3zM17 10h3v8h-3zM2 19h20v3H2z",
+ drink:"M3 3h18l-7.75 9v7H17v2H7v-2h3.75v-7z",
+ health:"M9 2h6v7h7v6h-7v7H9v-7H2V9h7z",
+ school:"M12 3L1 9l11 6 9-4.9V17h2V9zM5 13.2V17c0 1.7 3.1 3.5 7 3.5s7-1.8 7-3.5v-3.8l-7 3.8z",
+ flask:"M8 2h8v2h-1v5.2l5.6 9.4A2.2 2.2 0 0 1 18.7 22H5.3a2.2 2.2 0 0 1-1.9-3.4L9 9.2V4H8z",
+ laptop:"M4 4h16a1 1 0 0 1 1 1v11H3V5a1 1 0 0 1 1-1zM5.5 6.5v7h13v-7zM1 17.5h22V19a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z",
+ office:"M4 2h11v20H4zM15 8h5v14h-5zM6.5 5h2v2h-2zM10.5 5h2v2h-2zM6.5 9h2v2h-2zM10.5 9h2v2h-2zM6.5 13h2v2h-2zM10.5 13h2v2h-2zM8 18h3v4H8z",
+ ticket:"M2 6h20v4a2 2 0 0 0 0 4v4H2v-4a2 2 0 0 0 0-4z",
+ heart:"M12 21l-1.4-1.3C5.4 15 2 12 2 8.3 2 5.3 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.3 22 8.3c0 3.7-3.4 6.7-8.6 11.4z",
+ person:"M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM5 22v-4a7 7 0 0 1 14 0v4z",
+ pin:"M12 2a7 7 0 0 1 7 7c0 5.2-7 13-7 13S5 14.2 5 9a7 7 0 0 1 7-7zm0 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"
+};
+// Which built-in icon goes with which category name (any capitalization). Anything else gets the map-pin icon.
+var ICONS = {"coffee":"coffee","cafe":"coffee","cafes":"coffee","café":"coffee","cafés":"coffee","coffee shops":"coffee",
+ "restaurants":"food","restaurant":"food","dining":"food","food":"food","food & drink":"food",
+ "hotels":"bed","hotel":"bed","lodging":"bed","retail":"bag","shopping":"bag","shops":"bag",
+ "fitness":"dumbbell","gym":"dumbbell","gyms":"dumbbell","wellness":"heart","attractions":"star","entertainment":"ticket","arts & culture":"ticket",
+ "parks":"tree","park":"tree","open space":"tree","grocery":"cart","groceries":"cart","transit":"train","transportation":"train",
+ "parking":"parking","banks":"bank","bank":"bank","bars":"drink","nightlife":"drink","healthcare":"health","medical":"health",
+ "education":"school","schools":"school","childcare":"person","life science":"flask","life sciences":"flask","biotech":"flask",
+ "tech":"laptop","technology":"laptop","offices":"office","office":"office","corporate neighbors":"office","corporate tenants":"office"};
+var ICON_CACHE={};
+function builtinIcon(id){
+ if(!ICON_CACHE[id])ICON_CACHE[id]="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill-rule="evenodd" d="'+ICON_SHAPES[id]+'"/></svg>').replace(/'/g,"%27").replace(/\(/g,"%28").replace(/\)/g,"%29");
+ return ICON_CACHE[id];
+}
+function iconFor(key){return (S.catIcons&&S.catIcons[key])||builtinIcon(ICONS[key]||"pin");}
+function icoHtml(url,cls){return '<span class="'+(cls||"ico")+'" style="-webkit-mask-image:url(\''+url+'\');mask-image:url(\''+url+'\')"></span>';}
 // Default category pin colors, used in order. Change any of them in Customize look.
 // CBRE extended brand palette
 var BRAND = {"CBRE Green":"#003F2D","Accent Green":"#17E88F","Dark Green":"#012A2D","Dark Grey":"#435254","Light Grey":"#CAD1D3",
@@ -267,7 +310,7 @@ var PALETTE = ["#D2785A","#3E7CA6","#17E88F","#885073","#DBD99A","#1F3765","#A38
 
 /* ---------- Look & feel options ---------- */
 var DEFAULTS = {title:"Amenity Map",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F",
- headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},startCollapsed:false};
+ headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},catIcons:{},startCollapsed:false};
 var PRESETS = {
  "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F"},
  "Dark Green":{sideBg:"#012A2D",sideText:"#FFFFFF",accent:"#80BBAD",prop:"#012A2D",amen:"#80BBAD"},
@@ -320,7 +363,7 @@ function loadWebFont(f){
  document.head.appendChild(l);
 }
 function catKey(c){return String(c||"").trim().toLowerCase()||"other";}
-function catLabel(c){return (S.showIcons?(ICONS[catKey(c)]||"📍")+" ":"")+(c||"Other");}
+function catLabel(c){return c||"Other";}
 var CATS=[]; // [{key,label}] for the loaded data, in CSV order
 function catColor(i){var c=CATS[i];return (c&&S.catColors[c.key])||PALETTE[i%PALETTE.length];}
 function textOn(hex){
@@ -338,7 +381,12 @@ function applyLook(){
  st.setProperty("--head-font",hf.css);st.setProperty("--body-font",bf.css);
  $("title").textContent=S.title||DEFAULTS.title;
  var heads=document.querySelectorAll("[data-cat]");for(var i=0;i<heads.length;i++)heads[i].textContent=catLabel(heads[i].getAttribute("data-cat"));
- for(var j=0;j<CATS.length;j++){if(S.colorByCat)st.setProperty("--cat-"+j,catColor(j));else st.removeProperty("--cat-"+j);}
+ for(var j=0;j<CATS.length;j++){
+  if(S.colorByCat){st.setProperty("--cat-"+j,catColor(j));st.setProperty("--catfg-"+j,textOn(catColor(j)));}
+  else{st.removeProperty("--cat-"+j);st.removeProperty("--catfg-"+j);}
+ }
+ st.setProperty("--amen-fg",textOn(S.amen));
+ document.body.classList.toggle("icons",!!S.showIcons);
  document.body.classList.toggle("bycat",!!S.colorByCat);
  if(S.logo){$("logo").src=S.logo;$("logo").hidden=false;$("cLogoRemove").hidden=false;}
  else{$("logo").removeAttribute("src");$("logo").hidden=true;$("cLogoRemove").hidden=true;}
@@ -456,7 +504,10 @@ if(window.ResizeObserver)new ResizeObserver(onResize).observe($("map"));
 window.addEventListener("load",onResize);window.addEventListener("resize",onResize);
 var layer=L.layerGroup().addTo(map);
 var propIcon=L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-15],html:'<div class="pin prop"></div>'});
-function amIcon(i){return L.divIcon({className:"",iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-10],html:'<div class="pin amen" style="background:var(--cat-'+i+',var(--amen))"></div>'});}
+function amIcon(i,url){ // url = category icon, shown inside the pin when icons are on
+ return L.divIcon({className:"",iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-12],
+  html:'<div class="pinwrap"><div class="pin amen'+(url?" hasico":"")+'" style="background:var(--cat-'+i+',var(--amen));color:var(--catfg-'+i+',var(--amen-fg))">'+(url?icoHtml(url):"")+'</div></div>'});
+}
 function link(u){if(!u)return "";if(!/^https?:\/\//i.test(u))u="https://"+u;return '<br><a href="'+esc(u)+'" target="_blank" rel="noopener">Website</a>';}
 
 var DATA=null;
@@ -482,7 +533,7 @@ function render(d,keepView){
  function chip(label,ci){
   var b=document.createElement("button");b.type="button";b.className="chip";
   if(ci==null)b.textContent=label;
-  else{b.innerHTML='<span class="dot" style="background:var(--cat-'+ci+',var(--amen))"></span><span class="name"></span>';
+  else{b.innerHTML='<span class="dot" style="background:var(--cat-'+ci+',var(--amen))"></span>'+icoHtml(iconFor(catKey(label)))+'<span class="name"></span>';
    b.lastChild.setAttribute("data-cat",label);b.lastChild.textContent=catLabel(label);}
   b.onclick=function(){isolate(ci==null?null:ci);};chips.appendChild(b);return b;
  }
@@ -493,8 +544,8 @@ function render(d,keepView){
   var g={key:c.key,el:document.createElement("div"),layer:L.layerGroup().addTo(layer),bounds:[P],chip:chip(c.label,ci)};
   g.el.className="group"+(S.startCollapsed?" collapsed":"");
   var head=document.createElement("button");head.type="button";head.className="cat";head.setAttribute("aria-expanded",!S.startCollapsed);
-  head.innerHTML='<span class="dot" style="background:var(--cat-'+ci+',var(--amen))"></span><span class="name"></span><span class="count">'+items.length+'</span><span class="chev"></span>';
-  head.children[1].setAttribute("data-cat",c.label);head.children[1].textContent=catLabel(c.label);
+  head.innerHTML='<span class="dot" style="background:var(--cat-'+ci+',var(--amen))"></span>'+icoHtml(iconFor(c.key))+'<span class="name"></span><span class="count">'+items.length+'</span><span class="chev"></span>';
+  var nm=head.querySelector(".name");nm.setAttribute("data-cat",c.label);nm.textContent=catLabel(c.label);
   head.onclick=function(){setOpen(g,g.el.classList.contains("collapsed"));};
   if(FLAT){head.hidden=true;g.el.className="group";}
   var box=document.createElement("div");box.className="items";
@@ -502,7 +553,7 @@ function render(d,keepView){
   items.forEach(function(a){
    var pop=L.popup({autoPan:false,offset:[0,-8]}).setLatLng([a.lat,a.lng])
     .setContent("<b>"+esc(a.name)+"</b><br>"+esc(a.address)+"<br>~"+a.walk+" min walk (est.)"+link(a.website));
-   var m=L.marker([a.lat,a.lng],{icon:amIcon(FLAT?"none":ci),draggable:editing}).addTo(g.layer)
+   var m=L.marker([a.lat,a.lng],{icon:FLAT?amIcon("none"):amIcon(ci,iconFor(c.key)),draggable:editing}).addTo(g.layer)
     .bindTooltip(esc(a.name||a.address||"(no name)"),{direction:"top",offset:[0,-10],className:"am-label"}); // hover: name only
    var card=document.createElement("div");card.className="card";
    card.textContent=a.name||a.address||"(no name)";
@@ -714,6 +765,7 @@ window.addEventListener("drop",function(e){
 });
 
 /* ---------- Customize panel ---------- */
+var ICON_TARGET=null;
 var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"prop",cAmen:"amen"};
 (function buildPanel(){
  Object.keys(BRAND).forEach(function(n){var o=document.createElement("option");o.value=BRAND[n].toLowerCase();o.label=n;$("brandColors").appendChild(o);});
@@ -744,6 +796,12 @@ var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"
  $("cIcons").onchange=function(){S.showIcons=this.checked;applyLook();};
  $("cCollapsed").onchange=function(){S.startCollapsed=this.checked;GROUPS.forEach(function(g){setOpen(g,!S.startCollapsed);});};
  $("cByCat").onchange=function(){S.colorByCat=this.checked;fillPanel();applyLook();};
+ $("cIconFile").onchange=function(){
+  var f=this.files[0];this.value="";if(!f||!ICON_TARGET)return;
+  if(f.size>300*1024){$("cMsg").textContent="That icon is over 300 KB. Please use a smaller SVG or PNG.";return;}
+  if(!/svg|png|webp/i.test(f.type+f.name)){$("cMsg").textContent="Icons need to be SVG or PNG files.";return;}
+  var r=new FileReader();r.onload=function(){S.catIcons[ICON_TARGET]=r.result;$("cMsg").textContent="";render(DATA,true);fillPanel();};r.readAsDataURL(f);
+ };
  $("cLogo").onchange=function(){if(this.files[0])loadLogo(this.files[0]);this.value="";};
  $("cLogoRemove").onclick=function(){S.logo="";applyLook();};
  $("cReset").onclick=function(){["sideBg","sideText","accent","prop","amen","headFont","bodyFont","mapStyle","colorByCat"].forEach(function(k){S[k]=DEFAULTS[k];});S.catColors={};fillPanel();applyLook();};
@@ -757,13 +815,18 @@ function fillPanel(){
   var listed=isListed(S[p[1]]);$(p[0]).value=listed?S[p[1]]:"__other";
   $(p[0]+"Other").hidden=listed;$(p[0]+"Other").value=listed?"":S[p[1]];
  });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cCollapsed").checked=!!S.startCollapsed;
- $("cByCat").checked=!!S.colorByCat;$("catColors").innerHTML="";$("catColors").hidden=$("catHint").hidden=!S.colorByCat;
+ $("cByCat").checked=!!S.colorByCat;$("catColors").innerHTML="";$("catColors").hidden=$("catHint").hidden=FLAT;
  if(!FLAT)CATS.forEach(function(c,i){
   var row=document.createElement("div");row.className="crow";
-  var inp=document.createElement("input");inp.type="color";inp.setAttribute("list","brandColors");inp.value=catColor(i);
+  var inp=document.createElement("input");inp.type="color";inp.setAttribute("list","brandColors");inp.value=catColor(i);inp.hidden=!S.colorByCat;
   inp.addEventListener("input",function(){S.catColors[c.key]=this.value.toUpperCase();applyLook();});
+  var ib=document.createElement("button");ib.type="button";ib.className="icobtn";ib.title="Upload your own icon (SVG or PNG)";
+  ib.innerHTML=icoHtml(iconFor(c.key),"ipv");ib.onclick=function(){ICON_TARGET=c.key;$("cIconFile").click();};
   var lab=document.createElement("span");lab.textContent=c.label;
-  row.appendChild(inp);row.appendChild(lab);$("catColors").appendChild(row);
+  row.appendChild(inp);row.appendChild(ib);row.appendChild(lab);
+  if(S.catIcons[c.key]){var rs=document.createElement("button");rs.type="button";rs.className="icoreset";rs.textContent="Use default icon";
+   rs.onclick=function(){delete S.catIcons[c.key];render(DATA,true);fillPanel();};row.appendChild(rs);}
+  $("catColors").appendChild(row);
  });
 }
 function loadLogo(f){
