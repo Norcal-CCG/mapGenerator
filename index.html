@@ -45,6 +45,7 @@ body.bycat .dot{display:inline-block}
 .chip:hover{background:color-mix(in srgb,var(--side-text) 12%,transparent)}
 .chip.on{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
 .chip.on .dot{box-shadow:0 0 0 2px var(--accent-text)}
+.walk{font-style:italic;opacity:.9}
 .am-label{font:600 13px var(--body-font);color:#1a1a1a;border:0;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .pin{border:3px solid #fff;border-radius:50%;box-sizing:border-box}
 .pin.prop{width:30px;height:30px;border-width:4px;background:var(--prop);box-shadow:0 0 8px rgba(0,0,0,.35)}
@@ -552,7 +553,7 @@ function render(d,keepView){
   g.el.appendChild(head);g.el.appendChild(box);list.appendChild(g.el);GROUPS.push(g);
   items.forEach(function(a){
    var pop=L.popup({autoPan:false,offset:[0,-8]}).setLatLng([a.lat,a.lng])
-    .setContent("<b>"+esc(a.name)+"</b><br>"+esc(a.address)+"<br>~"+a.walk+" min walk (est.)"+link(a.website));
+    .setContent("<b>"+esc(a.name)+"</b><br>"+esc(a.address)+"<br><span class=\"walk\">~"+a.walk+" min walk (est.)</span>"+link(a.website));
    var m=L.marker([a.lat,a.lng],{icon:FLAT?amIcon("none"):amIcon(ci,iconFor(c.key)),draggable:editing}).addTo(g.layer)
     .bindTooltip(esc(a.name||a.address||"(no name)"),{direction:"top",offset:[0,-10],className:"am-label"}); // hover: name only
    var card=document.createElement("div");card.className="card";
