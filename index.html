@@ -36,6 +36,7 @@ body.view #tools{display:none}
 .cat .chev{margin-left:auto;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .2s}
 .group.collapsed .chev{transform:rotate(-45deg)}
 .group.collapsed .items{display:none}
+.cat[hidden]{display:none}
 .dot{display:none;width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--side-text) 35%,transparent)}
 body.bycat .dot{display:inline-block}
 #filters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px}
@@ -137,7 +138,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
    <details class="help">
     <summary>Don't have data yet? Get a blank template or a Copilot prompt</summary>
     <p><button type="button" class="linkbtn" id="btnTemplate">Download blank CSV template</button> &nbsp;Fill it in with Excel, then save as "CSV UTF-8" and drop it in above.</p>
-    <p class="hint">Or paste this into Copilot. Change the parts in [brackets]:</p>
+    <p class="hint">Or paste this into Copilot. Change the parts in [brackets]. Swap or add categories to fit the market, like Parking or Corporate Neighbors.</p>
     <textarea id="samplePrompt" readonly></textarea>
     <div class="row"><button type="button" class="ghost" id="btnCopyPrompt">Copy prompt</button></div>
    </details>
@@ -167,6 +168,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
  <div id="presets"></div>
 
  <div class="clbl">Colors</div>
+ <datalist id="brandColors"></datalist>
  <div class="crow"><input type="color" id="cSideBg"><span>Sidebar background</span></div>
  <div class="crow"><input type="color" id="cSideText"><span>Sidebar text</span></div>
  <div class="crow"><input type="color" id="cAccent"><span>Accent (headings &amp; buttons)</span></div>
@@ -223,16 +225,22 @@ var ICONS = {"coffee":"☕","cafe":"☕","cafes":"☕","café":"☕","cafés":"�
  "education":"🎓","schools":"🎓","childcare":"🧸","life science":"🔬","life sciences":"🔬","biotech":"🔬",
  "tech":"💻","technology":"💻","offices":"🏢","office":"🏢","corporate neighbors":"🏢"};
 // Default category pin colors, used in order. Change any of them in Customize look.
-var PALETTE = ["#E4572E","#2E86AB","#F2B33D","#8E5BA8","#3BAA6E","#D64F8A","#1B9AAA","#8C6D46","#F28C28","#5C6BC0"];
+// CBRE extended brand palette
+var BRAND = {"CBRE Green":"#003F2D","Accent Green":"#17E88F","Dark Green":"#012A2D","Dark Grey":"#435254","Light Grey":"#CAD1D3",
+ "Midnight":"#032842","Sage":"#538184","Celadon":"#80BBAD","Wheat":"#DBD99A","Cement":"#7F8480",
+ "Data Orange":"#D2785A","Data Purple":"#885073","Data Light Purple":"#A388BF","Data Blue":"#1F3765","Data Light Blue":"#3E7CA6"};
+// Default category pin colors (brand data colors first), used in order
+var PALETTE = ["#D2785A","#3E7CA6","#17E88F","#885073","#DBD99A","#1F3765","#A388BF","#80BBAD","#538184","#7F8480"];
 
 /* ---------- Look & feel options ---------- */
-var DEFAULTS = {title:"Amenity Map",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#79C98A",prop:"#003F2D",amen:"#79C98A",
+var DEFAULTS = {title:"Amenity Map",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F",
  headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},startCollapsed:false};
 var PRESETS = {
- "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#79C98A",prop:"#003F2D",amen:"#79C98A"},
- "Light":     {sideBg:"#F4F6F5",sideText:"#003F2D",accent:"#1F7A5A",prop:"#003F2D",amen:"#2FA36B"},
- "Charcoal":  {sideBg:"#2B2B2B",sideText:"#FFFFFF",accent:"#80BBAD",prop:"#1A1A1A",amen:"#80BBAD"},
- "Navy":      {sideBg:"#12284C",sideText:"#FFFFFF",accent:"#F2B33D",prop:"#12284C",amen:"#F2B33D"}
+ "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F"},
+ "Dark Green":{sideBg:"#012A2D",sideText:"#FFFFFF",accent:"#80BBAD",prop:"#012A2D",amen:"#80BBAD"},
+ "Light":     {sideBg:"#FFFFFF",sideText:"#003F2D",accent:"#538184",prop:"#003F2D",amen:"#538184"},
+ "Midnight":  {sideBg:"#032842",sideText:"#FFFFFF",accent:"#DBD99A",prop:"#032842",amen:"#3E7CA6"},
+ "Dark Grey": {sideBg:"#435254",sideText:"#FFFFFF",accent:"#CAD1D3",prop:"#012A2D",amen:"#80BBAD"}
 };
 var FONTS = [
  {name:"Segoe UI",css:'"Segoe UI",Arial,sans-serif'},
@@ -345,7 +353,8 @@ function readData(text){
   var addr=g(c.addr),city=g(c.city),stz=(g(c.state)+" "+g(c.zip)).trim();
   if(city&&addr.toLowerCase().indexOf(city.toLowerCase())<0)addr+=(addr?", ":"")+city;
   if(stz&&addr.indexOf(stz)<0)addr+=(addr?", ":"")+stz;
-  var o={name:g(c.name),category:g(c.cat),address:addr,lat:parseFloat(g(c.lat)),lng:parseFloat(g(c.lng)),website:g(c.web)};
+  var cat=g(c.cat);if(/^group\s*\d*$/i.test(cat))cat=""; // BAM default groups ("Group 1") aren't real categories
+  var o={name:g(c.name),category:cat,address:addr,lat:parseFloat(g(c.lat)),lng:parseFloat(g(c.lng)),website:g(c.web)};
   if(isNaN(o.lat)||isNaN(o.lng)||Math.abs(o.lat)>90||Math.abs(o.lng)>180){skipped.push((o.name||"Row "+(i+2))+" (missing or invalid coordinates)");return;}
   items.push(o);
  });
@@ -365,7 +374,7 @@ function toStandardCSV(prop,list){
 function toBamCSV(){
  var out=["Group Name,Property Name,Address,City,State,ZIP,Lat,Long"];
  [DATA.property].concat(DATA.amenities).forEach(function(o,i){
-  out.push([csvCell(i===0?"Subject Property":(o.category||"Other")),csvCell(o.name),csvCell(o.address),"","","",o.lat.toFixed(6),o.lng.toFixed(6)].join(","));
+  out.push([csvCell(i===0?"Subject Property":(o.category||"Group 1")),csvCell(o.name),csvCell(o.address),"","","",o.lat.toFixed(6),o.lng.toFixed(6)].join(","));
  });
  return out.join("\r\n");
 }
@@ -396,8 +405,22 @@ function setMapStyle(s){
  try{gl.getMaplibreMap().setStyle(styleUrl(s));currentStyle=s;}catch(e){}
 }
 // Redraw the map whenever its box changes size (embeds like Vev resize after load)
-if(window.ResizeObserver)new ResizeObserver(function(){map.invalidateSize();}).observe($("map"));
-window.addEventListener("load",function(){map.invalidateSize();});
+// Zoom to a set of points. If the map's size changes afterwards (page still laying out, Vev resizing the embed),
+// re-apply the same zoom so the view stays centered and tight, until the viewer moves the map themselves.
+var FIT=null,USER_MOVED=false;
+function fitTo(b,opts){FIT={b:b,o:opts||{padding:[28,28],maxZoom:17}};USER_MOVED=false;doFit(true);}
+function doFit(anim){
+ if(!FIT)return;var b=FIT.b,o={};for(var k in FIT.o)o[k]=FIT.o[k];o.animate=!!anim;
+ if(b.length>1)map.fitBounds(b,o);else if(b.length)map.setView(b[0],16,{animate:!!anim});
+}
+["wheel","touchstart","mousedown","keydown"].forEach(function(ev){$("map").addEventListener(ev,function(){USER_MOVED=true;},{passive:true});});
+var lastSize="";
+function onResize(){
+ var el=$("map"),sz=el.clientWidth+"x"+el.clientHeight;if(sz===lastSize||!el.clientWidth)return;lastSize=sz;
+ map.invalidateSize({animate:false});if(!USER_MOVED)doFit(false);
+}
+if(window.ResizeObserver)new ResizeObserver(onResize).observe($("map"));
+window.addEventListener("load",onResize);window.addEventListener("resize",onResize);
 var layer=L.layerGroup().addTo(map);
 var propIcon=L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-15],html:'<div class="pin prop"></div>'});
 function amIcon(i){return L.divIcon({className:"",iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-10],html:'<div class="pin amen" style="background:var(--cat-'+i+',var(--amen))"></div>'});}
@@ -416,6 +439,7 @@ function render(d){
   .bindTooltip(esc(d.property.name),{permanent:true,direction:"top",offset:[0,-16],className:"prop-label"});
  d.amenities.forEach(function(a){a.walk=walkMin(P,[a.lat,a.lng]);});
  CATS=[];GROUPS=[];var seen={};
+ FLAT=d.amenities.every(function(a){return !(a.category||"").trim();}); // no categories: plain list, no headings
  d.amenities.forEach(function(a){var k=catKey(a.category);if(!seen[k]){seen[k]=true;CATS.push({key:k,label:(a.category||"").trim()||"Other"});}});
 
  // Filter chips: "All" + one per category (isolate a category on the map)
@@ -437,12 +461,13 @@ function render(d){
   head.innerHTML='<span class="dot" style="background:var(--cat-'+ci+',var(--amen))"></span><span class="name"></span><span class="count">'+items.length+'</span><span class="chev"></span>';
   head.children[1].setAttribute("data-cat",c.label);head.children[1].textContent=catLabel(c.label);
   head.onclick=function(){setOpen(g,g.el.classList.contains("collapsed"));};
+  if(FLAT){head.hidden=true;g.el.className="group";}
   var box=document.createElement("div");box.className="items";
   g.el.appendChild(head);g.el.appendChild(box);list.appendChild(g.el);GROUPS.push(g);
   items.forEach(function(a){
    var pop=L.popup({autoPan:false,offset:[0,-8]}).setLatLng([a.lat,a.lng])
     .setContent("<b>"+esc(a.name)+"</b><br>"+esc(a.address)+"<br>~"+a.walk+" min walk (est.)"+link(a.website));
-   var m=L.marker([a.lat,a.lng],{icon:amIcon(ci)}).addTo(g.layer)
+   var m=L.marker([a.lat,a.lng],{icon:amIcon(FLAT?"none":ci)}).addTo(g.layer)
     .bindTooltip(esc(a.name),{direction:"top",offset:[0,-10],className:"am-label"}); // hover: name only
    var card=document.createElement("div");card.className="card";
    card.textContent=a.name;
@@ -451,7 +476,7 @@ function render(d){
     setOpen(g,true);
     if(card.scrollIntoView)card.scrollIntoView({block:"nearest",behavior:"smooth"});
     m.closeTooltip();
-    map.fitBounds([P,[a.lat,a.lng]],{paddingTopLeft:[60,150],paddingBottomRight:[60,60],maxZoom:17});
+    fitTo([P,[a.lat,a.lng]],{paddingTopLeft:[60,150],paddingBottomRight:[60,60],maxZoom:17});
     pop.openOn(map);
    }
    card.onclick=select;m.on("click",select);
@@ -464,7 +489,7 @@ function render(d){
  $("note").textContent=d.amenities.length+" amenities loaded."+(d.skipped.length?"\nSkipped (fix in the CSV): "+d.skipped.join("; "):"");
 }
 
-var GROUPS=[],ALL_BOUNDS=[];
+var GROUPS=[],ALL_BOUNDS=[],FLAT=false;
 function setOpen(g,open){g.el.classList.toggle("collapsed",!open);g.el.firstChild.setAttribute("aria-expanded",open);}
 // Show one category (index) or all (null) on the map and in the list, then zoom to fit it with the property
 function isolate(ci,initial){
@@ -478,7 +503,7 @@ function isolate(ci,initial){
  });
  var all=$("filters").firstChild;if(all)all.classList.toggle("on",ci==null);
  var b=ci==null?ALL_BOUNDS:GROUPS[ci].bounds;
- if(b.length>1)map.fitBounds(b,{padding:[40,40],maxZoom:17});else if(b.length)map.setView(b[0],16);
+ fitTo(b);
  if(!initial&&$("side").scrollTo)$("side").scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -552,7 +577,7 @@ var SAMPLE_PROMPT=["Make me a downloadable CSV file of amenities within a [15-mi
 "",
 "• First row: the property itself, with Category = Subject Property",
 "• Categories (use these exact names): [Café, Restaurant, Fitness, Hotel, Retail]",
-"• Up to [8] places per category, closest first",
+"• Up to [10] places per category, closest first",
 "• Latitude and Longitude to 6 decimal places, pinpointing the actual business, not the street or neighborhood",
 "• Only include places that are currently open and that you can verify; leave anything you can't verify out and list it separately",
 "• Website = the official homepage; leave it blank if there isn't one. Never guess a URL."].join("\n");
@@ -586,6 +611,8 @@ window.addEventListener("drop",function(e){
 /* ---------- Customize panel ---------- */
 var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"prop",cAmen:"amen"};
 (function buildPanel(){
+ Object.keys(BRAND).forEach(function(n){var o=document.createElement("option");o.value=BRAND[n].toLowerCase();o.label=n;$("brandColors").appendChild(o);});
+ ["cSideBg","cSideText","cAccent","cProp","cAmen"].forEach(function(id){$(id).setAttribute("list","brandColors");});
  ["cHead","cBody"].forEach(function(id){
   FONTS.forEach(function(f){var o=document.createElement("option");o.value=f.name;o.textContent=f.name+(f.web?" (web font)":"");$(id).appendChild(o);});
   var o=document.createElement("option");o.value="__other";o.textContent="Other Google Font…";$(id).appendChild(o);
@@ -626,9 +653,9 @@ function fillPanel(){
   $(p[0]+"Other").hidden=listed;$(p[0]+"Other").value=listed?"":S[p[1]];
  });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cCollapsed").checked=!!S.startCollapsed;
  $("cByCat").checked=!!S.colorByCat;$("catColors").innerHTML="";$("catColors").hidden=$("catHint").hidden=!S.colorByCat;
- CATS.forEach(function(c,i){
+ if(!FLAT)CATS.forEach(function(c,i){
   var row=document.createElement("div");row.className="crow";
-  var inp=document.createElement("input");inp.type="color";inp.value=catColor(i);
+  var inp=document.createElement("input");inp.type="color";inp.setAttribute("list","brandColors");inp.value=catColor(i);
   inp.addEventListener("input",function(){S.catColors[c.key]=this.value.toUpperCase();applyLook();});
   var lab=document.createElement("span");lab.textContent=c.label;
   row.appendChild(inp);row.appendChild(lab);$("catColors").appendChild(row);
