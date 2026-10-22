@@ -136,6 +136,9 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 .icobtn:hover{border-color:#79C98A}.ipv{width:18px;height:18px}
 .icoreset{margin-left:auto;border:0;background:none;color:#5a6b64;font:12px "Segoe UI",Arial,sans-serif;text-decoration:underline;cursor:pointer}
 .crow input[type=range]{width:110px;accent-color:#003F2D}
+.transit-btn{display:flex;align-items:center;gap:6px;background:#fff;color:#003F2D;border:0;border-radius:16px;padding:7px 12px;font:600 13px var(--body-font);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.transit-btn.on{background:#003F2D;color:#fff}
+.tico{display:inline-block;width:14px;height:14px;background:currentColor;-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
 #cLogoRemove{margin-top:8px;border:1px solid #c9d6cf;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font:13px "Segoe UI",Arial,sans-serif}
 
 @media (max-width:700px){
@@ -267,6 +270,11 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
   <option value="positron">Clean light gray</option>
   <option value="bright">Bright</option>
  </select></label>
+ <label class="crow"><input type="checkbox" id="cTransit"><span>Show transit stops (train, subway &amp; ferry)</span></label>
+ <label class="crow"><input type="checkbox" id="cBus"><span>Include bus stops</span></label>
+ <label class="crow"><input type="checkbox" id="cTransitBtn"><span>Show a "Transit" on/off button on the map</span></label>
+ <label class="crow"><input type="checkbox" id="cHidePOI"><span>Hide the base map's own shop &amp; restaurant labels</span></label>
+ <p class="small">Stops show as icons only; viewers hover one to see its name.</p>
 
  <div class="clbl">Logo (optional)</div>
  <input type="file" id="cLogo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
@@ -308,7 +316,8 @@ var ICON_SHAPES={
  ticket:"M2 6h20v4a2 2 0 0 0 0 4v4H2v-4a2 2 0 0 0 0-4z",
  heart:"M12 21l-1.4-1.3C5.4 15 2 12 2 8.3 2 5.3 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.3 22 8.3c0 3.7-3.4 6.7-8.6 11.4z",
  person:"M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM5 22v-4a7 7 0 0 1 14 0v4z",
- pin:"M12 2a7 7 0 0 1 7 7c0 5.2-7 13-7 13S5 14.2 5 9a7 7 0 0 1 7-7zm0 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"
+ pin:"M12 2a7 7 0 0 1 7 7c0 5.2-7 13-7 13S5 14.2 5 9a7 7 0 0 1 7-7zm0 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
+ bus:"M6 2h12a3 3 0 0 1 3 3v12a2 2 0 0 1-1 1.7V21h-3v-2H7v2H4v-2.3A2 2 0 0 1 3 17V5a3 3 0 0 1 3-3zM5.5 6v5h13V6zM7 13.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5zM17 13.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5z"
 };
 // Which built-in icon goes with which category name (any capitalization). Anything else gets the map-pin icon.
 var ICONS = {"coffee":"coffee","cafe":"coffee","cafes":"coffee","café":"coffee","cafés":"coffee","coffee shops":"coffee",
@@ -336,7 +345,7 @@ var PALETTE = ["#D2785A","#3E7CA6","#17E88F","#885073","#DBD99A","#1F3765","#A38
 
 /* ---------- Look & feel options ---------- */
 var DEFAULTS = {title:"Amenity Map",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F",
- headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},catIcons:{},startCollapsed:false,sideAlpha:1};
+ headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},catIcons:{},startCollapsed:false,sideAlpha:1,transitOn:false,transitBus:false,transitButton:true,hideBasePOI:false};
 var PRESETS = {
  "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F"},
  "Dark Green":{sideBg:"#012A2D",sideText:"#FFFFFF",accent:"#80BBAD",prop:"#012A2D",amen:"#80BBAD"},
@@ -416,6 +425,7 @@ function applyLook(){
  }
  st.setProperty("--amen-fg",textOn(S.amen));
  document.body.classList.toggle("icons",!!S.showIcons);
+ applyBase();
  document.body.classList.toggle("bycat",!!S.colorByCat);
  if(S.logo){$("logo").src=S.logo;$("logo").hidden=false;$("cLogoRemove").hidden=false;}
  else{$("logo").removeAttribute("src");$("logo").hidden=true;$("cLogoRemove").hidden=true;}
@@ -512,7 +522,42 @@ if(L.maplibreGL&&hasWebGL()){
 }
 function setMapStyle(s){
  if(!gl||s===currentStyle)return;
- try{gl.getMaplibreMap().setStyle(styleUrl(s));currentStyle=s;}catch(e){}
+ try{gl.getMaplibreMap().setStyle(styleUrl(s),{diff:false});currentStyle=s;}catch(e){}
+}
+
+/* ---------- Base map extras: transit stops (icons only, name on hover) & hiding the base map's own labels ---------- */
+// Uses OpenMapTiles "poi" data that OpenFreeMap already sends. Everything here is wrapped so a problem can't break the map.
+var RAIL_F=["any",["match",["get","class"],["railway","rail"],true,false],["==",["get","subclass"],"ferry_terminal"]];
+var BUS_F=["==",["get","class"],"bus"];
+var TRANSIT_ON=!!S.transitOn,BASE_POI=["poi_r1","poi_r7","poi_r20"];
+function stopImage(shape,bg){
+ var px=2,d=20*px,c=document.createElement("canvas");c.width=c.height=d;var x=c.getContext("2d");
+ x.beginPath();x.arc(d/2,d/2,d/2-px,0,Math.PI*2);x.fillStyle=bg;x.fill();x.lineWidth=2*px;x.strokeStyle="#fff";x.stroke();
+ var sc=11*px/24;x.save();x.translate(d/2-12*sc,d/2-12*sc);x.scale(sc,sc);x.fillStyle="#fff";x.fill(new Path2D(ICON_SHAPES[shape]),"evenodd");x.restore();
+ return x.getImageData(0,0,d,d);
+}
+function onBaseStyle(){ // runs each time a base map style finishes loading
+ try{
+  var m=gl.getMaplibreMap();
+  if(!m.hasImage("cb-rail"))m.addImage("cb-rail",stopImage("train","#435254"),{pixelRatio:2});
+  if(!m.hasImage("cb-bus"))m.addImage("cb-bus",stopImage("bus","#3E7CA6"),{pixelRatio:2});
+  if(m.getLayer("poi_transit"))m.setLayoutProperty("poi_transit","visibility","none"); // the style's own labeled stops
+  BASE_POI.forEach(function(id){if(m.getLayer(id))m.setFilter(id,["all",m.getFilter(id),["!",["any",RAIL_F,BUS_F]]]);});
+  if(!m.getLayer("cb-transit"))m.addLayer({id:"cb-transit",type:"symbol",source:"openmaptiles","source-layer":"poi",minzoom:13,
+   filter:RAIL_F,layout:{"icon-image":["match",["get","class"],"bus","cb-bus","cb-rail"],"icon-size":["match",["get","class"],"bus",0.8,1],
+   "icon-allow-overlap":true,"icon-ignore-placement":true,"symbol-sort-key":["match",["get","class"],"bus",2,1],visibility:"none"}});
+  applyBase();
+ }catch(e){if(window.console)console.warn("Transit layer unavailable",e);}
+}
+function applyBase(){
+ if(typeof gl=="undefined"||!gl)return;
+ try{
+  var m=gl.getMaplibreMap();if(!m||!m.getLayer||!m.getLayer("cb-transit"))return;
+  m.setLayoutProperty("cb-transit","visibility",TRANSIT_ON?"visible":"none");
+  m.setFilter("cb-transit",S.transitBus?["any",RAIL_F,BUS_F]:RAIL_F);
+  BASE_POI.forEach(function(id){if(m.getLayer(id))m.setLayoutProperty(id,"visibility",S.hideBasePOI?"none":"visible");});
+ }catch(e){}
+ var tb=document.querySelector(".transit-btn");if(tb){tb.parentNode.style.display=S.transitButton?"":"none";tb.classList.toggle("on",TRANSIT_ON);}
 }
 // Redraw the map whenever its box changes size (embeds like Vev resize after load)
 // Zoom to a set of points. If the map's size changes afterwards (page still laying out, Vev resizing the embed),
@@ -536,6 +581,30 @@ function onResize(){
 if(window.ResizeObserver)new ResizeObserver(onResize).observe($("map"));
 window.addEventListener("load",onResize);window.addEventListener("resize",onResize);
 var layer=L.layerGroup().addTo(map);
+if(gl)try{ // transit extras: any failure here only disables transit, never the map
+ try{var _m=gl.getMaplibreMap();_m.on("style.load",onBaseStyle);if(_m.isStyleLoaded&&_m.isStyleLoaded())onBaseStyle();}catch(e){}
+ // "Transit" on/off button on the map, for viewers
+ var TransitCtl=L.Control.extend({options:{position:"topright"},onAdd:function(){
+  var d=L.DomUtil.create("div","leaflet-control");var b=L.DomUtil.create("button","transit-btn",d);b.type="button";
+  b.innerHTML='<span class="tico" style="-webkit-mask-image:url(\''+builtinIcon("train")+'\');mask-image:url(\''+builtinIcon("train")+'\')"></span>Transit';
+  b.title="Show or hide transit stops";L.DomEvent.disableClickPropagation(d);
+  b.onclick=function(){TRANSIT_ON=!TRANSIT_ON;applyBase();};return d;}});
+ new TransitCtl().addTo(map);
+ // Hover a stop to see its name
+ var stopTip=L.tooltip({direction:"top",offset:[0,-10],className:"am-label"}),hoverQ=false,lastE=null;
+ map.on("mousemove",function(e){lastE=e;if(hoverQ)return;hoverQ=true;requestAnimationFrame(function(){hoverQ=false;
+  if(!TRANSIT_ON){if(map.hasLayer(stopTip))map.removeLayer(stopTip);return;}
+  try{
+   var m=gl.getMaplibreMap(),pt=m.project([lastE.latlng.lng,lastE.latlng.lat]);
+   var f=m.queryRenderedFeatures([[pt.x-9,pt.y-9],[pt.x+9,pt.y+9]],{layers:["cb-transit"]});
+   if(f.length){var pr=f[0].properties,c=f[0].geometry.coordinates;
+    stopTip.setLatLng([c[1],c[0]]).setContent(esc(pr["name:en"]||pr.name_en||pr.name||"Transit stop"));
+    if(!map.hasLayer(stopTip))stopTip.addTo(map);map.getContainer().style.cursor="pointer";}
+   else{if(map.hasLayer(stopTip))map.removeLayer(stopTip);map.getContainer().style.cursor="";}
+  }catch(err){}
+ });});
+ map.on("mouseout",function(){if(map.hasLayer(stopTip))map.removeLayer(stopTip);});
+}catch(e){if(window.console)console.warn("Transit extras unavailable",e);}
 var propIcon=L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-15],html:'<div class="pin prop"></div>'});
 function amIcon(i,url){ // url = category icon, shown inside the pin when icons are on
  return L.divIcon({className:"",iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-12],
@@ -884,6 +953,10 @@ var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"
  $("cMap").onchange=function(){S.mapStyle=this.value;applyLook();};
  $("cIcons").onchange=function(){S.showIcons=this.checked;applyLook();};
  $("cCollapsed").onchange=function(){S.startCollapsed=this.checked;GROUPS.forEach(function(g){setOpen(g,!S.startCollapsed);});};
+ $("cTransit").onchange=function(){S.transitOn=TRANSIT_ON=this.checked;applyBase();};
+ $("cBus").onchange=function(){S.transitBus=this.checked;applyBase();};
+ $("cTransitBtn").onchange=function(){S.transitButton=this.checked;applyBase();};
+ $("cHidePOI").onchange=function(){S.hideBasePOI=this.checked;applyBase();};
  $("cAlpha").addEventListener("input",function(){S.sideAlpha=this.value/100;$("cAlphaV").textContent=this.value+"%";applyLook();});
  $("cByCat").onchange=function(){S.colorByCat=this.checked;fillPanel();applyLook();};
  $("cIconFile").onchange=function(){
@@ -897,6 +970,7 @@ var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"
  $("cReset").onclick=function(){["sideBg","sideText","sideAlpha","accent","prop","amen","headFont","bodyFont","mapStyle","colorByCat"].forEach(function(k){S[k]=DEFAULTS[k];});S.catColors={};fillPanel();applyLook();};
  $("cDone").onclick=$("cClose").onclick=function(){$("custom").classList.add("hide");$("cMsg").textContent="";};
  $("btnCustom").onclick=function(){fillPanel();$("custom").classList.remove("hide");};
+ if(!gl){["cTransit","cBus","cTransitBtn","cHidePOI"].forEach(function(id){$(id).disabled=true;});}
  if(!gl){$("cMap").disabled=true;$("cMap").title="Map styles need WebGL; this browser is using the backup map.";}
 })();
 function fillPanel(){
@@ -904,7 +978,7 @@ function fillPanel(){
  $("cTitle").value=S.title;[["cHead","headFont"],["cBody","bodyFont"]].forEach(function(p){
   var listed=isListed(S[p[1]]);$(p[0]).value=listed?S[p[1]]:"__other";
   $(p[0]+"Other").hidden=listed;$(p[0]+"Other").value=listed?"":S[p[1]];
- });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cAlpha").value=Math.round((+S.sideAlpha||1)*100);$("cAlphaV").textContent=$("cAlpha").value+"%";$("cCollapsed").checked=!!S.startCollapsed;
+ });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cTransit").checked=TRANSIT_ON;$("cBus").checked=!!S.transitBus;$("cTransitBtn").checked=!!S.transitButton;$("cHidePOI").checked=!!S.hideBasePOI;$("cAlpha").value=Math.round((+S.sideAlpha||1)*100);$("cAlphaV").textContent=$("cAlpha").value+"%";$("cCollapsed").checked=!!S.startCollapsed;
  $("cByCat").checked=!!S.colorByCat;$("catColors").innerHTML="";$("catColors").hidden=$("catHint").hidden=FLAT;
  if(!FLAT)CATS.forEach(function(c,i){
   var row=document.createElement("div");row.className="crow";
