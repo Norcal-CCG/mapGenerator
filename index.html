@@ -187,8 +187,8 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
   <div id="stepLoad">
    <h3>Load amenity data</h3>
    <p>Drop in a file from <b>BAM 2.0</b>, Copilot, or your own spreadsheet (.csv or .xlsx), or paste rows copied from Excel below. New here? See the <a href="https://norcal-ccg.github.io/mapGenerator/Amenity_Map_Maker_Guide.pdf" target="_blank" rel="noopener">how-to guide</a>.</p>
-   <div id="drop">Drop a .csv or .xlsx file here, or click to choose one</div>
-   <input type="file" id="file" accept=".csv,.txt,.xlsx,.xls,text/csv" hidden>
+   <div id="drop">Drop a .csv or .xlsx file here, or a map you saved before (.html) to keep editing it. Or click to choose one.</div>
+   <input type="file" id="file" accept=".csv,.txt,.xlsx,.xls,.html,.htm,text/csv,text/html" hidden>
    <textarea id="paste" placeholder="Paste here, header row included. Works with BAM 2.0 columns (Property Name, Address, Lat, Long) or Name, Category, Address, Latitude, Longitude, Website"></textarea>
    <div id="msg"></div>
    <div class="row"><button class="ghost" id="btnCancel">Cancel</button><button id="btnPaste">Load pasted data</button></div>
@@ -933,8 +933,23 @@ function loadXlsx(f){
  sc.onload=go;sc.onerror=function(){$("msg").textContent="Couldn't load the Excel reader. Save the file as CSV UTF-8 and try again.";showLoader();};
  document.head.appendChild(sc);
 }
+// Re-open a map saved with "Save shareable map": restores its data AND all its settings, ready to keep editing
+function loadSavedMap(html){
+ var dm=html.match(/<script id="csv-data"[^>]*>([\s\S]*?)<\/script>/),sm=html.match(/<script id="settings-data"[^>]*>([\s\S]*?)<\/script>/);
+ var csv=dm?dm[1].replace(/<\\\//g,"</").trim():"";
+ if(!csv){$("msg").textContent="That file doesn't look like a map saved from the Amenity Map Maker.\nUse “Save shareable map” to create one, or load a CSV/Excel file instead.";showLoader();return;}
+ var saved={};try{saved=JSON.parse(sm?sm[1]:"{}")||{};}catch(e){}
+ if(saved.transitOn&&(!saved.transitMode||saved.transitMode=="off"))saved.transitMode="stops"; // early beta maps
+ for(var k in DEFAULTS){var v=saved[k]!=null?saved[k]:DEFAULTS[k];S[k]=(v&&typeof v=="object")?JSON.parse(JSON.stringify(v)):v;}
+ if(typeof TRANSIT_ON!="undefined")TRANSIT_ON=S.transitMode!="off";
+ if(loadText(csv)){
+  applyLook();if(!$("custom").classList.contains("hide"))fillPanel();
+  $("note").textContent="Re-opened "+(DATA?DATA.property.name:"your map")+" with all its settings. Make your changes, then save again.";
+ }
+}
 function loadFile(f){
  if(/\.xlsx?$/i.test(f.name))return loadXlsx(f);
+ if(/\.html?$/i.test(f.name)){var rh=new FileReader();rh.onload=function(){loadSavedMap(rh.result);};rh.readAsText(f,"utf-8");return;}
  var r=new FileReader();
  r.onload=function(){
   if(r.result.indexOf("\uFFFD")>=0){ // not UTF-8 (e.g. Excel "CSV" instead of "CSV UTF-8")
