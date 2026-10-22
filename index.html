@@ -87,7 +87,21 @@ body.icons .pin.amen.hasico{width:28px;height:28px;border-width:2px}
 #etable input.bad{border-color:#c0392b;background:#fdf0ee}
 #etable tr.prop td{background:#f3f8f5}
 #etable .ptag{font-size:12px;font-weight:600;color:var(--ui);padding:0 6px;white-space:nowrap}
-#etable th:nth-child(1){width:21%}#etable th:nth-child(2){width:13%}#etable th:nth-child(3){width:26%}#etable th:nth-child(4),#etable th:nth-child(5){width:10%}#etable th:nth-child(6){width:17%}#etable th:nth-child(7){width:34px}
+#etable th:nth-child(1){width:21%}#etable th:nth-child(2){width:13%}#etable th:nth-child(3){width:26%}#etable th:nth-child(4),#etable th:nth-child(5){width:10%}#etable th:nth-child(6){width:17%}#etable th:nth-child(7){width:78px}
+.place{border:1px solid #c9d6cf;background:#fff;color:#003F2D;font:600 12px "Segoe UI",Arial,sans-serif;cursor:pointer;padding:4px 7px;border-radius:4px;white-space:nowrap}.place:hover{border-color:#79C98A;background:#eef8f1}
+#etable tr.flash td{animation:flash 1.6s ease-out}@keyframes flash{0%{background:#c9f2db}100%{background:transparent}}
+#placer{position:absolute;top:12px;right:12px;left:calc(var(--cover,340px) + 60px);z-index:1200;background:#fff;color:#1a1a1a;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:12px 14px;font:14px "Segoe UI",Arial,sans-serif;max-width:560px}
+#placer[hidden]{display:none}
+#placer .pt{font-weight:600;color:#003F2D;margin-bottom:8px}
+#placer .prow{display:flex;gap:8px}
+#plSearch{flex:1;padding:8px;border:1px solid #c9d6cf;border-radius:6px;font:14px "Segoe UI",Arial,sans-serif}
+#plCancel{border:1px solid #003F2D;background:#fff;color:#003F2D;border-radius:6px;padding:0 12px;font:600 13px "Segoe UI",Arial,sans-serif;cursor:pointer}
+#plResults{list-style:none;margin:6px 0 0;padding:0;max-height:240px;overflow-y:auto}
+#plResults li{padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px}#plResults li:hover{background:#eef8f1}
+#plResults li small{display:block;color:#5a6b64}
+#plMsg{font-size:12px;color:#5a6b64;margin-top:6px}
+body.placing .leaflet-container{cursor:crosshair}
+@media (max-width:700px){#placer{left:12px}}
 .del{border:0;background:none;color:#8a2a1f;font-size:18px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:4px}.del:hover{background:#fbe9e7}
 #emsg{font-size:13px;margin-top:10px;color:#a33}
 #msg2{font-size:13px;margin-top:10px;color:#a33;white-space:pre-line}
@@ -191,6 +205,13 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
    <div class="row"><button class="ghost" id="btnPropBack">Back</button><button id="btnPropUse">Make the map</button></div>
   </div>
  </div>
+</div>
+
+<div id="placer" hidden>
+ <div class="pt" id="plTitle">Click the map where this place is</div>
+ <div class="prow"><input type="text" id="plSearch" placeholder="…or search for a business or address" autocomplete="off"><button type="button" id="plCancel">Cancel</button></div>
+ <ul id="plResults"></ul>
+ <div id="plMsg"></div>
 </div>
 
 <div id="editor" class="hide">
@@ -634,6 +655,7 @@ function editRow(o,isProp){
   tr.appendChild(td);
  });
  var td=document.createElement("td");
+ var pb=document.createElement("button");pb.type="button";pb.className="place";pb.title="Set the location by clicking the map or searching";pb.textContent="📍 Place";pb.onclick=function(){startPlacing(tr);};td.appendChild(pb);
  if(!isProp){var x=document.createElement("button");x.type="button";x.className="del";x.title="Remove this place";x.innerHTML="&times;";x.onclick=function(){tr.remove();};td.appendChild(x);}
  tr.appendChild(td);
  $("etable").tBodies[0].appendChild(tr);return tr;
@@ -648,7 +670,62 @@ function openEditor(){
 }
 $("btnEdit").onclick=openEditor;
 $("eCancel").onclick=function(){$("editor").classList.add("hide");};
-$("eAdd").onclick=function(){var tr=editRow({},false);tr.querySelector("input").focus();tr.scrollIntoView({block:"nearest"});};
+$("eAdd").onclick=function(){var tr=editRow({},false);startPlacing(tr);};
+
+/* ---------- Place a point: click the map or search ---------- */
+var PLACING=null,plTimer=null,plReq=0;
+function rowVal(tr,k){var i=tr.querySelector('input[data-k="'+k+'"]');return i?i.value.trim():"";}
+function setRow(tr,k,v){var i=tr.querySelector('input[data-k="'+k+'"]');if(i){i.value=v;i.classList.remove("bad");}}
+function startPlacing(tr){
+ PLACING=tr;$("editor").classList.add("hide");document.body.classList.add("placing");
+ document.documentElement.style.setProperty("--cover",sideCover()+"px");
+ var nm=rowVal(tr,"name");
+ $("plTitle").textContent="Click the map where "+(nm?"“"+nm+"”":"the new place")+" is";
+ $("plSearch").value=nm;$("plResults").innerHTML="";$("plMsg").textContent="";
+ $("placer").hidden=false;$("plSearch").focus();if(nm)searchPlaces(nm);
+}
+function endPlacing(filled){
+ var tr=PLACING;PLACING=null;$("placer").hidden=true;document.body.classList.remove("placing");
+ $("editor").classList.remove("hide");
+ if(tr){tr.scrollIntoView({block:"center"});if(filled){tr.classList.remove("flash");void tr.offsetWidth;tr.classList.add("flash");}
+  var empty=tr.querySelector('input[data-k="name"]');if(empty&&!empty.value)empty.focus();}
+}
+function placeAt(lat,lng,name,addr){
+ if(!PLACING)return;
+ setRow(PLACING,"lat",(+lat).toFixed(6));setRow(PLACING,"lng",(+lng).toFixed(6));
+ if(name&&!rowVal(PLACING,"name"))setRow(PLACING,"name",name);
+ if(addr&&!rowVal(PLACING,"address"))setRow(PLACING,"address",addr);
+ endPlacing(true);
+}
+map.on("click",function(e){if(PLACING)placeAt(e.latlng.lat,e.latlng.lng);});
+$("plCancel").onclick=function(){endPlacing(false);};
+document.addEventListener("keydown",function(e){if(e.key=="Escape"&&PLACING)endPlacing(false);});
+$("plSearch").addEventListener("input",function(){clearTimeout(plTimer);var q=this.value.trim();plTimer=setTimeout(function(){searchPlaces(q);},400);});
+$("plSearch").addEventListener("keydown",function(e){if(e.key=="Enter"){clearTimeout(plTimer);searchPlaces(this.value.trim());}});
+// Free place search (Photon, OpenStreetMap data, no key), weighted toward the property's area
+function searchPlaces(q){
+ var ul=$("plResults");ul.innerHTML="";
+ if(q.length<3){$("plMsg").textContent="";return;}
+ $("plMsg").textContent="Searching…";var id=++plReq;
+ var c=DATA?DATA.property:{lat:map.getCenter().lat,lng:map.getCenter().lng};
+ fetch("https://photon.komoot.io/api/?limit=6&lang=en&q="+encodeURIComponent(q)+"&lat="+c.lat+"&lon="+c.lng)
+  .then(function(r){if(!r.ok)throw 0;return r.json();})
+  .then(function(j){
+   if(id!==plReq)return;
+   var f=(j&&j.features)||[];
+   $("plMsg").textContent=f.length?"Pick a result, or click the map instead. Results come from OpenStreetMap, so double-check the spot.":"No matches. Try different words, or click the map.";
+   f.forEach(function(ft){
+    var pr=ft.properties||{},ll=ft.geometry.coordinates;
+    var street=[pr.housenumber,pr.street].filter(Boolean).join(" ");
+    var addr=[street,pr.city,[pr.state,pr.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    var title=pr.name||street||addr||"Unnamed place";
+    var li=document.createElement("li");li.innerHTML=esc(title)+"<small>"+esc(addr||pr.osm_value||"")+"</small>";
+    li.onclick=function(){placeAt(ll[1],ll[0],pr.name||"",addr);};
+    ul.appendChild(li);
+   });
+  })
+  .catch(function(){if(id===plReq)$("plMsg").textContent="Search isn't available right now. Click the map to place the pin instead.";});
+}
 $("eApply").onclick=function(){
  var rows=[].slice.call($("etable").tBodies[0].rows),bad=0,prop=null,list=[];
  rows.forEach(function(tr,i){
