@@ -10,10 +10,11 @@
 :root{--side-bg:#003F2D;--side-text:#FFFFFF;--accent:#79C98A;--accent-text:#003F2D;--prop:#003F2D;--prop-text:#FFFFFF;--amen:#79C98A;
  --head-font:"Segoe UI",Arial,sans-serif;--body-font:"Segoe UI",Arial,sans-serif;--ui:#003F2D}
 html,body{height:100%;margin:0;font-family:var(--body-font)}
-#wrap{display:flex;height:100%;min-height:600px}
-#map{min-height:0}
-#side{width:340px;flex:none;box-sizing:border-box;background:var(--side-bg);color:var(--side-text);padding:18px;overflow-y:auto;display:flex;flex-direction:column}
-#map{flex:1;background:#e8ece9}
+#wrap{display:flex;height:100%;min-height:600px;position:relative}
+/* The map fills the whole area; the sidebar floats over its left edge, so a see-through sidebar shows the map */
+#map{position:absolute;inset:0;z-index:0;background:#e8ece9}
+#side{position:relative;z-index:1;width:340px;flex:none;box-sizing:border-box;background:var(--side-fill,var(--side-bg));-webkit-backdrop-filter:blur(var(--side-blur,0px));backdrop-filter:blur(var(--side-blur,0px));color:var(--side-text);padding:18px;overflow-y:auto;display:flex;flex-direction:column}
+#map .leaflet-top.leaflet-left{left:340px}
 #logo{display:block;max-width:100%;max-height:60px;object-fit:contain;object-position:left;margin:0 0 14px}
 #logo[hidden]{display:none}
 h2{margin:0 0 4px;font:600 22px/1.25 var(--head-font)}
@@ -120,12 +121,14 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 .icobtn{width:32px;height:30px;border:1px solid #c9d6cf;border-radius:6px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#33453e;flex:none}
 .icobtn:hover{border-color:#79C98A}.ipv{width:18px;height:18px}
 .icoreset{margin-left:auto;border:0;background:none;color:#5a6b64;font:12px "Segoe UI",Arial,sans-serif;text-decoration:underline;cursor:pointer}
+.crow input[type=range]{width:110px;accent-color:#003F2D}
 #cLogoRemove{margin-top:8px;border:1px solid #c9d6cf;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font:13px "Segoe UI",Arial,sans-serif}
 
 @media (max-width:700px){
  #wrap{flex-direction:column-reverse}
  #side{width:100%;height:45%;min-height:260px;flex:none}
- #map{flex:1 1 auto;min-height:320px}
+ #map{position:relative;inset:auto;flex:1 1 auto;min-height:320px}
+ #map .leaflet-top.leaflet-left{left:0}
  #custom{width:100%;top:40%}
 }
 </style>
@@ -214,6 +217,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
  <div class="clbl">Colors</div>
  <datalist id="brandColors"></datalist>
  <div class="crow"><input type="color" id="cSideBg"><span>Sidebar background</span></div>
+ <div class="crow"><input type="range" id="cAlpha" min="40" max="100" step="5"><span>Sidebar opacity <b id="cAlphaV"></b></span></div>
  <div class="crow"><input type="color" id="cSideText"><span>Sidebar text</span></div>
  <div class="crow"><input type="color" id="cAccent"><span>Accent (headings &amp; buttons)</span></div>
  <div class="crow"><input type="color" id="cProp"><span>Property pin &amp; label</span></div>
@@ -311,7 +315,7 @@ var PALETTE = ["#D2785A","#3E7CA6","#17E88F","#885073","#DBD99A","#1F3765","#A38
 
 /* ---------- Look & feel options ---------- */
 var DEFAULTS = {title:"Amenity Map",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F",
- headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},catIcons:{},startCollapsed:false};
+ headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},catIcons:{},startCollapsed:false,sideAlpha:1};
 var PRESETS = {
  "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F"},
  "Dark Green":{sideBg:"#012A2D",sideText:"#FFFFFF",accent:"#80BBAD",prop:"#012A2D",amen:"#80BBAD"},
@@ -375,6 +379,9 @@ function textOn(hex){
 function applyLook(){
  var st=document.documentElement.style;
  st.setProperty("--side-bg",S.sideBg);st.setProperty("--side-text",S.sideText);
+ var al=Math.max(0.4,Math.min(1,+S.sideAlpha||1)),n=parseInt(String(S.sideBg).replace("#",""),16);
+ st.setProperty("--side-fill",al<1&&!isNaN(n)?"rgba("+(n>>16&255)+","+(n>>8&255)+","+(n&255)+","+al+")":S.sideBg);
+ st.setProperty("--side-blur",al<1?"6px":"0px");
  st.setProperty("--accent",S.accent);st.setProperty("--accent-text",textOn(S.accent));
  st.setProperty("--prop",S.prop);st.setProperty("--prop-text",textOn(S.prop));
  st.setProperty("--amen",S.amen);
@@ -491,8 +498,12 @@ function setMapStyle(s){
 // re-apply the same zoom so the view stays centered and tight, until the viewer moves the map themselves.
 var FIT=null,USER_MOVED=false;
 function fitTo(b,opts){FIT={b:b,o:opts||{padding:[28,28],maxZoom:17}};USER_MOVED=false;doFit(true);}
+// Width of the sidebar covering the map (0 on phones, where the list sits below the map)
+function sideCover(){return getComputedStyle($("map")).position=="absolute"?$("side").offsetWidth:0;}
 function doFit(anim){
- if(!FIT)return;var b=FIT.b,o={};for(var k in FIT.o)o[k]=FIT.o[k];o.animate=!!anim;
+ if(!FIT)return;var b=FIT.b,o={},off=sideCover();for(var k in FIT.o)o[k]=FIT.o[k];o.animate=!!anim;
+ if(o.padding){o.paddingTopLeft=[o.padding[0]+off,o.padding[1]];o.paddingBottomRight=o.padding;delete o.padding;}
+ else if(o.paddingTopLeft)o.paddingTopLeft=[o.paddingTopLeft[0]+off,o.paddingTopLeft[1]];
  if(b.length>1)map.fitBounds(b,o);else if(b.length)map.setView(b[0],16,{animate:!!anim});
 }
 ["wheel","touchstart","mousedown","keydown"].forEach(function(ev){$("map").addEventListener(ev,function(){USER_MOVED=true;},{passive:true});});
@@ -796,6 +807,7 @@ var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"
  $("cMap").onchange=function(){S.mapStyle=this.value;applyLook();};
  $("cIcons").onchange=function(){S.showIcons=this.checked;applyLook();};
  $("cCollapsed").onchange=function(){S.startCollapsed=this.checked;GROUPS.forEach(function(g){setOpen(g,!S.startCollapsed);});};
+ $("cAlpha").addEventListener("input",function(){S.sideAlpha=this.value/100;$("cAlphaV").textContent=this.value+"%";applyLook();});
  $("cByCat").onchange=function(){S.colorByCat=this.checked;fillPanel();applyLook();};
  $("cIconFile").onchange=function(){
   var f=this.files[0];this.value="";if(!f||!ICON_TARGET)return;
@@ -805,7 +817,7 @@ var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"
  };
  $("cLogo").onchange=function(){if(this.files[0])loadLogo(this.files[0]);this.value="";};
  $("cLogoRemove").onclick=function(){S.logo="";applyLook();};
- $("cReset").onclick=function(){["sideBg","sideText","accent","prop","amen","headFont","bodyFont","mapStyle","colorByCat"].forEach(function(k){S[k]=DEFAULTS[k];});S.catColors={};fillPanel();applyLook();};
+ $("cReset").onclick=function(){["sideBg","sideText","sideAlpha","accent","prop","amen","headFont","bodyFont","mapStyle","colorByCat"].forEach(function(k){S[k]=DEFAULTS[k];});S.catColors={};fillPanel();applyLook();};
  $("cDone").onclick=$("cClose").onclick=function(){$("custom").classList.add("hide");$("cMsg").textContent="";};
  $("btnCustom").onclick=function(){fillPanel();$("custom").classList.remove("hide");};
  if(!gl){$("cMap").disabled=true;$("cMap").title="Map styles need WebGL; this browser is using the backup map.";}
@@ -815,7 +827,7 @@ function fillPanel(){
  $("cTitle").value=S.title;[["cHead","headFont"],["cBody","bodyFont"]].forEach(function(p){
   var listed=isListed(S[p[1]]);$(p[0]).value=listed?S[p[1]]:"__other";
   $(p[0]+"Other").hidden=listed;$(p[0]+"Other").value=listed?"":S[p[1]];
- });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cCollapsed").checked=!!S.startCollapsed;
+ });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cAlpha").value=Math.round((+S.sideAlpha||1)*100);$("cAlphaV").textContent=$("cAlpha").value+"%";$("cCollapsed").checked=!!S.startCollapsed;
  $("cByCat").checked=!!S.colorByCat;$("catColors").innerHTML="";$("catColors").hidden=$("catHint").hidden=FLAT;
  if(!FLAT)CATS.forEach(function(c,i){
   var row=document.createElement("div");row.className="crow";
