@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>CBRE Amenity Map Maker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2215%22 fill=%22%23003F2D%22/%3E%3Cpath d=%22M9 21l15-6 16 6 15-6v30l-15 6-16-6-15 6z%22 fill=%22%2380BBAD%22/%3E%3Cpath d=%22M24 15l16 6v30l-16-6z%22 fill=%22%23538184%22/%3E%3Cpath d=%22M14 40c6-2 8-9 15-8s8 6 15 3%22 fill=%22none%22 stroke=%22%23DBD99A%22 stroke-width=%222.6%22 stroke-linecap=%22round%22 stroke-dasharray=%220.1 5.2%22/%3E%3Cpath d=%22M44 6a11 11 0 0 1 11 11c0 8.3-11 20-11 20S33 25.3 33 17A11 11 0 0 1 44 6z%22 fill=%22%2317E88F%22 stroke=%22%23003F2D%22 stroke-width=%222.5%22/%3E%3Ccircle cx=%2244%22 cy=%2217%22 r=%224.2%22 fill=%22%23003F2D%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <style>
@@ -136,8 +137,12 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 .icobtn:hover{border-color:#79C98A}.ipv{width:18px;height:18px}
 .icoreset{margin-left:auto;border:0;background:none;color:#5a6b64;font:12px "Segoe UI",Arial,sans-serif;text-decoration:underline;cursor:pointer}
 .crow input[type=range]{width:110px;accent-color:#003F2D}
-.transit-btn{display:flex;align-items:center;gap:6px;background:#fff;color:#003F2D;border:0;border-radius:16px;padding:7px 12px;font:600 13px var(--body-font);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.3)}
-.transit-btn.on{background:#003F2D;color:#fff}
+.ttoggle{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 10px;padding:8px 12px;background:transparent;color:var(--side-text);border:1px solid color-mix(in srgb,var(--side-text) 35%,transparent);border-radius:8px;font:600 13px var(--body-font);cursor:pointer;text-align:left}
+.ttoggle[hidden]{display:none}
+.ttoggle:hover{background:color-mix(in srgb,var(--side-text) 10%,transparent)}
+.ttoggle .sw{margin-left:auto;width:34px;height:18px;border-radius:9px;background:color-mix(in srgb,var(--side-text) 30%,transparent);position:relative;transition:background .2s;flex:none}
+.ttoggle .sw:after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s}
+.ttoggle.on .sw{background:var(--accent)}.ttoggle.on .sw:after{left:18px}
 .tico{display:inline-block;width:14px;height:14px;background:currentColor;-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
 #cLogoRemove{margin-top:8px;border:1px solid #c9d6cf;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font:13px "Segoe UI",Arial,sans-serif}
 
@@ -157,6 +162,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
   <h2 id="title">Amenity Map</h2>
   <p class="sub"><b id="pname"></b><br><span id="paddr"></span></p>
   <p class="sub">Click a location to see it in relation to the property.</p>
+  <button type="button" id="transitToggle" class="ttoggle" hidden aria-pressed="false"><span class="tico" id="ttIco"></span><span>Transit</span><span class="sw"></span></button>
   <div id="filters" hidden></div>
   <div id="list"></div>
   <div id="tools">
@@ -270,11 +276,21 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
   <option value="positron">Clean light gray</option>
   <option value="bright">Bright</option>
  </select></label>
- <label class="crow"><input type="checkbox" id="cTransit"><span>Show transit stops (train, subway &amp; ferry)</span></label>
- <label class="crow"><input type="checkbox" id="cBus"><span>Include bus stops</span></label>
- <label class="crow"><input type="checkbox" id="cTransitBtn"><span>Show a "Transit" on/off button on the map</span></label>
  <label class="crow"><input type="checkbox" id="cHidePOI"><span>Hide the base map's own shop &amp; restaurant labels</span></label>
- <p class="small">Stops show as icons only; viewers hover one to see its name.</p>
+
+ <div class="clbl">Transit</div>
+ <label class="f">Show<select id="cTMode">
+  <option value="off">Off</option>
+  <option value="stops">Stops only</option>
+  <option value="lines">Lines only</option>
+  <option value="both">Stops &amp; lines</option>
+ </select></label>
+ <div class="crow"><input type="color" id="cTColor"><span>Transit color (lines &amp; stops)</span></div>
+ <label class="crow"><input type="checkbox" id="cTIcons"><span>Show icons in stops (off = small dots)</span></label>
+ <label class="crow"><input type="checkbox" id="cBus"><span>Include bus stops</span></label>
+ <label class="crow"><input type="checkbox" id="cTransitBtn"><span>Show a "Transit" on/off switch in the list, for viewers</span></label>
+ <p class="small">Lines are train, subway, light rail and streetcar routes (no buses). Stops show without names; viewers hover one to see its name.</p>
+ <p class="small" id="mapStatus"></p>
 
  <div class="clbl">Logo (optional)</div>
  <input type="file" id="cLogo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
@@ -345,7 +361,7 @@ var PALETTE = ["#D2785A","#3E7CA6","#17E88F","#885073","#DBD99A","#1F3765","#A38
 
 /* ---------- Look & feel options ---------- */
 var DEFAULTS = {title:"Amenity Map",sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F",
- headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},catIcons:{},startCollapsed:false,sideAlpha:1,transitOn:false,transitBus:false,transitButton:true,hideBasePOI:false};
+ headFont:"Segoe UI",bodyFont:"Segoe UI",mapStyle:"liberty",logo:"",showIcons:false,colorByCat:true,catColors:{},catIcons:{},startCollapsed:false,sideAlpha:1,transitMode:"off",transitColor:"#435254",transitIcons:true,transitBus:false,transitButton:true,hideBasePOI:false};
 var PRESETS = {
  "CBRE Green":{sideBg:"#003F2D",sideText:"#FFFFFF",accent:"#17E88F",prop:"#003F2D",amen:"#17E88F"},
  "Dark Green":{sideBg:"#012A2D",sideText:"#FFFFFF",accent:"#80BBAD",prop:"#012A2D",amen:"#80BBAD"},
@@ -529,36 +545,81 @@ function setMapStyle(s){
 // Uses OpenMapTiles "poi" data that OpenFreeMap already sends. Everything here is wrapped so a problem can't break the map.
 var RAIL_F=["any",["match",["get","class"],["railway","rail"],true,false],["==",["get","subclass"],"ferry_terminal"]];
 var BUS_F=["==",["get","class"],"bus"];
-var TRANSIT_ON=!!S.transitOn,BASE_POI=["poi_r1","poi_r7","poi_r20"];
-function stopImage(shape,bg){
- var px=2,d=20*px,c=document.createElement("canvas");c.width=c.height=d;var x=c.getContext("2d");
- x.beginPath();x.arc(d/2,d/2,d/2-px,0,Math.PI*2);x.fillStyle=bg;x.fill();x.lineWidth=2*px;x.strokeStyle="#fff";x.stroke();
- var sc=11*px/24;x.save();x.translate(d/2-12*sc,d/2-12*sc);x.scale(sc,sc);x.fillStyle="#fff";x.fill(new Path2D(ICON_SHAPES[shape]),"evenodd");x.restore();
+if(S.transitOn&&S.transitMode=="off")S.transitMode="stops"; // maps saved with the first transit beta
+var TRANSIT_ON=S.transitMode!="off",BASE_POI=["poi_r1","poi_r7","poi_r20"];
+var LINE_F=["all",["match",["get","class"],["rail","transit"],true,false],["!",["has","service"]]]; // main rail & subway/light rail/tram, no yards or sidings
+function tShow(){var md=S.transitMode;return {stops:TRANSIT_ON&&(md=="stops"||md=="both"),lines:TRANSIT_ON&&(md=="lines"||md=="both")};}
+function glyphImage(shape,color,cssPx){ // a white or dark icon on a transparent background, drawn on top of the stop circle
+ var px=2,d=cssPx*px,c=document.createElement("canvas");c.width=c.height=d;var x=c.getContext("2d"),sc=d/24;
+ x.scale(sc,sc);x.fillStyle=color;x.fill(new Path2D(ICON_SHAPES[shape]),"evenodd");
  return x.getImageData(0,0,d,d);
 }
-function onBaseStyle(){ // runs each time a base map style finishes loading
- try{
-  var m=gl.getMaplibreMap();
-  if(!m.hasImage("cb-rail"))m.addImage("cb-rail",stopImage("train","#435254"),{pixelRatio:2});
-  if(!m.hasImage("cb-bus"))m.addImage("cb-bus",stopImage("bus","#3E7CA6"),{pixelRatio:2});
-  if(m.getLayer("poi_transit"))m.setLayoutProperty("poi_transit","visibility","none"); // the style's own labeled stops
-  BASE_POI.forEach(function(id){if(m.getLayer(id))m.setFilter(id,["all",m.getFilter(id),["!",["any",RAIL_F,BUS_F]]]);});
-  if(!m.getLayer("cb-transit"))m.addLayer({id:"cb-transit",type:"symbol",source:"openmaptiles","source-layer":"poi",minzoom:13,
-   filter:RAIL_F,layout:{"icon-image":["match",["get","class"],"bus","cb-bus","cb-rail"],"icon-size":["match",["get","class"],"bus",0.8,1],
-   "icon-allow-overlap":true,"icon-ignore-placement":true,"symbol-sort-key":["match",["get","class"],"bus",2,1],visibility:"none"}});
-  applyBase();
- }catch(e){if(window.console)console.warn("Transit layer unavailable",e);}
+var BASE_ERR="",BASE_STYLE_DONE=null;
+function baseMap(){try{return (typeof gl!="undefined"&&gl&&gl.getMaplibreMap)?gl.getMaplibreMap():null;}catch(e){return null;}}
+// Runs each time a base map style finishes loading. Each step is separate, so one problem can't block the others.
+function onBaseStyle(){
+ var m=baseMap();if(!m||!m.getLayer)return;
+ try{if(!m.getSource||!m.getSource("openmaptiles"))return;}catch(e){return;} // style not ready yet
+ var key=m.style||null; // MapLibre makes a new style object each time a style loads
+ if(key&&BASE_STYLE_DONE===key)return;BASE_STYLE_DONE=key;BASE_ERR="";
+ function step(name,fn){try{fn();}catch(e){BASE_ERR+=(BASE_ERR?"; ":"")+name+": "+(e&&e.message||e);if(window.console)console.warn("Map extras – "+name,e);}}
+ step("icons",function(){
+  [["rail","train",11],["bus","bus",9]].forEach(function(g){
+   if(!m.hasImage("cb-g-"+g[0]+"-w"))m.addImage("cb-g-"+g[0]+"-w",glyphImage(g[1],"#FFFFFF",g[2]),{pixelRatio:2});
+   if(!m.hasImage("cb-g-"+g[0]+"-d"))m.addImage("cb-g-"+g[0]+"-d",glyphImage(g[1],"#1A1A1A",g[2]),{pixelRatio:2});
+  });
+ });
+ step("hide labeled stops",function(){if(m.getLayer("poi_transit"))m.setLayoutProperty("poi_transit","visibility","none");});
+ step("separate stops from shop labels",function(){BASE_POI.forEach(function(id){if(m.getLayer(id)){var f=m.getFilter(id);if(f&&JSON.stringify(f).indexOf("ferry_terminal")>=0)return;m.setFilter(id,f?["all",f,["!",["any",RAIL_F,BUS_F]]]:["!",["any",RAIL_F,BUS_F]]);}});});
+ step("transit layers",function(){
+  if(!m.getSource("openmaptiles"))throw new Error("map data source not found");
+  var before;try{var ls=m.getStyle().layers;for(var i=0;i<ls.length;i++)if(ls[i].type=="symbol"){before=ls[i].id;break;}}catch(e){}
+  if(!m.getLayer("cb-tlines"))m.addLayer({id:"cb-tlines",type:"line",source:"openmaptiles","source-layer":"transportation",minzoom:10,filter:LINE_F,
+   layout:{"line-cap":"round","line-join":"round",visibility:"none"},
+   paint:{"line-color":"#435254","line-opacity":0.85,"line-width":["interpolate",["linear"],["zoom"],10,1,13,2,16,3.5,19,5]}},before); // under street names
+  if(!m.getLayer("cb-tdots"))m.addLayer({id:"cb-tdots",type:"circle",source:"openmaptiles","source-layer":"poi",minzoom:13,filter:RAIL_F,
+   layout:{visibility:"none"},paint:{"circle-color":"#435254","circle-radius":4,"circle-stroke-color":"#FFFFFF","circle-stroke-width":1.5}});
+  if(!m.getLayer("cb-tico"))m.addLayer({id:"cb-tico",type:"symbol",source:"openmaptiles","source-layer":"poi",minzoom:13,filter:RAIL_F,
+   layout:{"icon-image":["match",["get","class"],"bus","cb-g-bus-w","cb-g-rail-w"],"icon-allow-overlap":true,"icon-ignore-placement":true,visibility:"none"}});
+ });
+ applyBase();
 }
 function applyBase(){
- if(typeof gl=="undefined"||!gl)return;
- try{
-  var m=gl.getMaplibreMap();if(!m||!m.getLayer||!m.getLayer("cb-transit"))return;
-  m.setLayoutProperty("cb-transit","visibility",TRANSIT_ON?"visible":"none");
-  m.setFilter("cb-transit",S.transitBus?["any",RAIL_F,BUS_F]:RAIL_F);
-  BASE_POI.forEach(function(id){if(m.getLayer(id))m.setLayoutProperty(id,"visibility",S.hideBasePOI?"none":"visible");});
- }catch(e){}
- var tb=document.querySelector(".transit-btn");if(tb){tb.parentNode.style.display=S.transitButton?"":"none";tb.classList.toggle("on",TRANSIT_ON);}
+ var m=baseMap();
+ if(m&&m.getLayer){
+  onBaseStyle();
+  try{
+   var sh=tShow(),col=S.transitColor||"#435254",ic=!!S.transitIcons,tone=textOn(col)=="#FFFFFF"?"w":"d",sf=S.transitBus?["any",RAIL_F,BUS_F]:RAIL_F;
+   if(m.getLayer("cb-tlines")){m.setLayoutProperty("cb-tlines","visibility",sh.lines?"visible":"none");m.setPaintProperty("cb-tlines","line-color",col);}
+   if(m.getLayer("cb-tdots")){
+    m.setLayoutProperty("cb-tdots","visibility",sh.stops?"visible":"none");m.setFilter("cb-tdots",sf);
+    m.setPaintProperty("cb-tdots","circle-color",col);
+    m.setPaintProperty("cb-tdots","circle-radius",ic?["match",["get","class"],"bus",7.5,9.5]:["match",["get","class"],"bus",3,4]);
+    m.setPaintProperty("cb-tdots","circle-stroke-width",ic?2:1.5);
+   }
+   if(m.getLayer("cb-tico")){
+    m.setLayoutProperty("cb-tico","visibility",sh.stops&&ic?"visible":"none");m.setFilter("cb-tico",sf);
+    m.setLayoutProperty("cb-tico","icon-image",["match",["get","class"],"bus","cb-g-bus-"+tone,"cb-g-rail-"+tone]);
+   }
+  }catch(e){}
+  try{BASE_POI.forEach(function(id){if(m.getLayer(id))m.setLayoutProperty(id,"visibility",S.hideBasePOI?"none":"visible");});}catch(e){}
+ }
+ var tt=document.getElementById("transitToggle");
+ if(tt){tt.hidden=!(typeof gl!="undefined"&&gl&&S.transitButton&&S.transitMode!="off");tt.classList.toggle("on",TRANSIT_ON);tt.setAttribute("aria-pressed",TRANSIT_ON);}
+ mapStatus();
 }
+// Plain-language status under the map options, so it's obvious why an option isn't doing anything
+function mapStatus(){
+ var el=document.getElementById("mapStatus");if(!el)return;
+ var m=baseMap(),msg="";
+ if(typeof gl=="undefined"||!gl)msg="You're seeing the backup map (Esri), because this browser can't draw the detailed map (it needs WebGL). Map styles and these options only work on the detailed map.";
+ else if(!m||!m.getSource||!m.getSource("openmaptiles"))msg="Detailed map is still loading…";
+ else if(BASE_ERR)msg="Something went wrong setting up these options: "+BASE_ERR;
+ else if(tShow().stops&&map.getZoom()<13)msg="Zoom in closer to see transit stops.";
+ else if(tShow().lines&&map.getZoom()<10)msg="Zoom in closer to see transit lines.";
+ el.textContent=msg;el.style.color=BASE_ERR||!gl?"#a33":"";
+}
+
 // Redraw the map whenever its box changes size (embeds like Vev resize after load)
 // Zoom to a set of points. If the map's size changes afterwards (page still laying out, Vev resizing the embed),
 // re-apply the same zoom so the view stays centered and tight, until the viewer moves the map themselves.
@@ -582,21 +643,18 @@ if(window.ResizeObserver)new ResizeObserver(onResize).observe($("map"));
 window.addEventListener("load",onResize);window.addEventListener("resize",onResize);
 var layer=L.layerGroup().addTo(map);
 if(gl)try{ // transit extras: any failure here only disables transit, never the map
- try{var _m=gl.getMaplibreMap();_m.on("style.load",onBaseStyle);if(_m.isStyleLoaded&&_m.isStyleLoaded())onBaseStyle();}catch(e){}
- // "Transit" on/off button on the map, for viewers
- var TransitCtl=L.Control.extend({options:{position:"topright"},onAdd:function(){
-  var d=L.DomUtil.create("div","leaflet-control");var b=L.DomUtil.create("button","transit-btn",d);b.type="button";
-  b.innerHTML='<span class="tico" style="-webkit-mask-image:url(\''+builtinIcon("train")+'\');mask-image:url(\''+builtinIcon("train")+'\')"></span>Transit';
-  b.title="Show or hide transit stops";L.DomEvent.disableClickPropagation(d);
-  b.onclick=function(){TRANSIT_ON=!TRANSIT_ON;applyBase();};return d;}});
- new TransitCtl().addTo(map);
+ try{var _m=gl.getMaplibreMap();_m.on("style.load",onBaseStyle);_m.on("styledata",onBaseStyle);_m.on("idle",function(){onBaseStyle();mapStatus();});onBaseStyle();}catch(e){}
+ map.on("zoomend",mapStatus);
+ // "Transit stops" switch in the sidebar, for viewers
+ var ti=builtinIcon("train");$("ttIco").style.webkitMaskImage=$("ttIco").style.maskImage="url('"+ti+"')";
+ $("transitToggle").onclick=function(){TRANSIT_ON=!TRANSIT_ON;applyBase();};
  // Hover a stop to see its name
  var stopTip=L.tooltip({direction:"top",offset:[0,-10],className:"am-label"}),hoverQ=false,lastE=null;
  map.on("mousemove",function(e){lastE=e;if(hoverQ)return;hoverQ=true;requestAnimationFrame(function(){hoverQ=false;
-  if(!TRANSIT_ON){if(map.hasLayer(stopTip))map.removeLayer(stopTip);return;}
+  if(!tShow().stops){if(map.hasLayer(stopTip))map.removeLayer(stopTip);return;}
   try{
    var m=gl.getMaplibreMap(),pt=m.project([lastE.latlng.lng,lastE.latlng.lat]);
-   var f=m.queryRenderedFeatures([[pt.x-9,pt.y-9],[pt.x+9,pt.y+9]],{layers:["cb-transit"]});
+   var f=m.queryRenderedFeatures([[pt.x-9,pt.y-9],[pt.x+9,pt.y+9]],{layers:["cb-tdots"]});
    if(f.length){var pr=f[0].properties,c=f[0].geometry.coordinates;
     stopTip.setLatLng([c[1],c[0]]).setContent(esc(pr["name:en"]||pr.name_en||pr.name||"Transit stop"));
     if(!map.hasLayer(stopTip))stopTip.addTo(map);map.getContainer().style.cursor="pointer";}
@@ -927,7 +985,7 @@ var ICON_TARGET=null;
 var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"prop",cAmen:"amen"};
 (function buildPanel(){
  Object.keys(BRAND).forEach(function(n){var o=document.createElement("option");o.value=BRAND[n].toLowerCase();o.label=n;$("brandColors").appendChild(o);});
- ["cSideBg","cSideText","cAccent","cProp","cAmen"].forEach(function(id){$(id).setAttribute("list","brandColors");});
+ ["cSideBg","cSideText","cAccent","cProp","cAmen","cTColor"].forEach(function(id){$(id).setAttribute("list","brandColors");});
  ["cHead","cBody"].forEach(function(id){
   FONTS.forEach(function(f){var o=document.createElement("option");o.value=f.name;o.textContent=f.name+(f.web?" (web font)":"");$(id).appendChild(o);});
   var o=document.createElement("option");o.value="__other";o.textContent="Other Google Font…";$(id).appendChild(o);
@@ -953,7 +1011,9 @@ var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"
  $("cMap").onchange=function(){S.mapStyle=this.value;applyLook();};
  $("cIcons").onchange=function(){S.showIcons=this.checked;applyLook();};
  $("cCollapsed").onchange=function(){S.startCollapsed=this.checked;GROUPS.forEach(function(g){setOpen(g,!S.startCollapsed);});};
- $("cTransit").onchange=function(){S.transitOn=TRANSIT_ON=this.checked;applyBase();};
+ $("cTMode").onchange=function(){S.transitMode=this.value;TRANSIT_ON=this.value!="off";applyBase();};
+ $("cTColor").addEventListener("input",function(){S.transitColor=this.value.toUpperCase();applyBase();});
+ $("cTIcons").onchange=function(){S.transitIcons=this.checked;applyBase();};
  $("cBus").onchange=function(){S.transitBus=this.checked;applyBase();};
  $("cTransitBtn").onchange=function(){S.transitButton=this.checked;applyBase();};
  $("cHidePOI").onchange=function(){S.hideBasePOI=this.checked;applyBase();};
@@ -970,7 +1030,7 @@ var COLOR_FIELDS={cSideBg:"sideBg",cSideText:"sideText",cAccent:"accent",cProp:"
  $("cReset").onclick=function(){["sideBg","sideText","sideAlpha","accent","prop","amen","headFont","bodyFont","mapStyle","colorByCat"].forEach(function(k){S[k]=DEFAULTS[k];});S.catColors={};fillPanel();applyLook();};
  $("cDone").onclick=$("cClose").onclick=function(){$("custom").classList.add("hide");$("cMsg").textContent="";};
  $("btnCustom").onclick=function(){fillPanel();$("custom").classList.remove("hide");};
- if(!gl){["cTransit","cBus","cTransitBtn","cHidePOI"].forEach(function(id){$(id).disabled=true;});}
+ if(!gl){["cTMode","cTColor","cTIcons","cBus","cTransitBtn","cHidePOI"].forEach(function(id){$(id).disabled=true;});}
  if(!gl){$("cMap").disabled=true;$("cMap").title="Map styles need WebGL; this browser is using the backup map.";}
 })();
 function fillPanel(){
@@ -978,7 +1038,7 @@ function fillPanel(){
  $("cTitle").value=S.title;[["cHead","headFont"],["cBody","bodyFont"]].forEach(function(p){
   var listed=isListed(S[p[1]]);$(p[0]).value=listed?S[p[1]]:"__other";
   $(p[0]+"Other").hidden=listed;$(p[0]+"Other").value=listed?"":S[p[1]];
- });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;$("cTransit").checked=TRANSIT_ON;$("cBus").checked=!!S.transitBus;$("cTransitBtn").checked=!!S.transitButton;$("cHidePOI").checked=!!S.hideBasePOI;$("cAlpha").value=Math.round((+S.sideAlpha||1)*100);$("cAlphaV").textContent=$("cAlpha").value+"%";$("cCollapsed").checked=!!S.startCollapsed;
+ });$("cMap").value=S.mapStyle;$("cIcons").checked=!!S.showIcons;mapStatus();$("cTMode").value=S.transitMode;$("cTColor").value=S.transitColor;$("cTIcons").checked=!!S.transitIcons;$("cBus").checked=!!S.transitBus;$("cTransitBtn").checked=!!S.transitButton;$("cHidePOI").checked=!!S.hideBasePOI;$("cAlpha").value=Math.round((+S.sideAlpha||1)*100);$("cAlphaV").textContent=$("cAlpha").value+"%";$("cCollapsed").checked=!!S.startCollapsed;
  $("cByCat").checked=!!S.colorByCat;$("catColors").innerHTML="";$("catColors").hidden=$("catHint").hidden=FLAT;
  if(!FLAT)CATS.forEach(function(c,i){
   var row=document.createElement("div");row.className="crow";
