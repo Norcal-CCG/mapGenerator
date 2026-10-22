@@ -52,7 +52,18 @@ body.bycat .dot{display:inline-block}
 /* Data loader */
 #loader{position:fixed;inset:0;background:rgba(0,40,28,.6);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;box-sizing:border-box;font-family:"Segoe UI",Arial,sans-serif}
 #loader.hide{display:none}
-.panel{background:#fff;color:#1a1a1a;border-radius:12px;max-width:540px;width:100%;padding:24px;box-sizing:border-box;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.panel{background:#fff;color:#1a1a1a;border-radius:12px;max-width:560px;width:100%;max-height:calc(100vh - 32px);overflow-y:auto;padding:24px;box-sizing:border-box;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.help{margin-top:16px;border-top:1px solid #e1e8e4;padding-top:12px;font-size:14px}
+.help summary{cursor:pointer;color:var(--ui);font-weight:600}
+.help p{margin:10px 0 0}
+.hint{font-size:13px;color:#5a6b64}
+.linkbtn{background:none;border:0;padding:0;color:var(--ui);font:600 14px "Segoe UI",Arial,sans-serif;text-decoration:underline;cursor:pointer}
+#samplePrompt{height:150px;margin-top:6px;font:13px/1.45 "Segoe UI",Arial,sans-serif;background:#f6f8f7}
+#stepProp select,#stepProp input{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:8px;border:1px solid #c9d6cf;border-radius:6px;font:14px "Segoe UI",Arial,sans-serif;background:#fff}
+#stepProp select{margin-top:14px}
+.mf{display:block;font-size:13px;color:#333;margin-top:10px}
+.mrow{display:flex;gap:10px}.mrow .mf{flex:1}
+#msg2{font-size:13px;margin-top:10px;color:#a33;white-space:pre-line}
 .panel h3{margin:0 0 6px;color:var(--ui);font-size:20px}
 .panel p{margin:0;font-size:14px;color:#444}
 #drop{border:2px dashed #79C98A;border-radius:10px;padding:22px;text-align:center;cursor:pointer;color:#2c5446;margin:14px 0;font-size:14px}
@@ -104,6 +115,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
    <button id="btnSave">Save shareable map (.html)</button>
    <button id="btnCustom" class="ghost">Customize look</button>
    <button id="btnCsv" class="ghost">Download CSV</button>
+   <button id="btnBam" class="ghost">Download CSV for BAM 2.0</button>
    <button id="btnLoad" class="ghost">Load different data</button>
    <div id="note"></div>
   </div>
@@ -113,13 +125,37 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
 
 <div id="loader" class="hide">
  <div class="panel">
-  <h3>Load amenity data</h3>
-  <p>Drop in a CSV from BAM 2.0, Copilot, or other source, or paste its text below. Sample Prompt - can you make me a downloadable CSV file with a list of amenities within a <b>15 minute walking distance<b> from <b>Salesforce Tower, San Francisco<b>? Please include the following information for each amenity - Name, Category, Address, Latitude, Longitude, Website (these should be the column headers, "categories" should include Café, Restaurant, Fitness, Hotel, Retail)</p>
-  <div id="drop">Drop a .csv file here, or click to choose one</div>
-  <input type="file" id="file" accept=".csv,text/csv" hidden>
-  <textarea id="paste" placeholder="Name,Category,Address,Latitude,Longitude,Website&#10;&quot;Property Name&quot;,Subject Property,&quot;Address&quot;,37.789800,-122.396800,"></textarea>
-  <div id="msg"></div>
-  <div class="row"><button class="ghost" id="btnCancel">Cancel</button><button id="btnPaste">Load pasted data</button></div>
+  <div id="stepLoad">
+   <h3>Load amenity data</h3>
+   <p>Drop in a file from <b>BAM 2.0</b>, Copilot, or your own spreadsheet (.csv or .xlsx), or paste rows copied from Excel below.</p>
+   <div id="drop">Drop a .csv or .xlsx file here, or click to choose one</div>
+   <input type="file" id="file" accept=".csv,.txt,.xlsx,.xls,text/csv" hidden>
+   <textarea id="paste" placeholder="Paste here, header row included. Works with BAM 2.0 columns (Property Name, Address, Lat, Long) or Name, Category, Address, Latitude, Longitude, Website"></textarea>
+   <div id="msg"></div>
+   <div class="row"><button class="ghost" id="btnCancel">Cancel</button><button id="btnPaste">Load pasted data</button></div>
+
+   <details class="help">
+    <summary>Don't have data yet? Get a blank template or a Copilot prompt</summary>
+    <p><button type="button" class="linkbtn" id="btnTemplate">Download blank CSV template</button> &nbsp;Fill it in with Excel, then save as "CSV UTF-8" and drop it in above.</p>
+    <p class="hint">Or paste this into Copilot. Change the parts in [brackets]:</p>
+    <textarea id="samplePrompt" readonly></textarea>
+    <div class="row"><button type="button" class="ghost" id="btnCopyPrompt">Copy prompt</button></div>
+   </details>
+  </div>
+
+  <div id="stepProp" hidden>
+   <h3>Which one is your property?</h3>
+   <p>This file doesn't mark a main property (BAM exports usually don't). Pick it from the list, or enter it yourself.</p>
+   <select id="propPick"></select>
+   <div id="propManual" hidden>
+    <label class="mf">Property name<input type="text" id="mName"></label>
+    <label class="mf">Address<input type="text" id="mAddr"></label>
+    <div class="mrow"><label class="mf">Latitude<input type="text" id="mLat" placeholder="37.789800"></label><label class="mf">Longitude<input type="text" id="mLng" placeholder="-122.396800"></label></div>
+    <p class="hint">Tip: in Google Maps, right-click the building and click the numbers at the top to copy its latitude and longitude.</p>
+   </div>
+   <div id="msg2"></div>
+   <div class="row"><button class="ghost" id="btnPropBack">Back</button><button id="btnPropUse">Make the map</button></div>
+  </div>
  </div>
 </div>
 
@@ -269,38 +305,69 @@ function applyLook(){
 }
 
 /* ---------- CSV ---------- */
-function parseRows(text){
+function parseRows(text,delim){
  var rows=[],row=[],f="",q=false;
  for(var i=0;i<text.length;i++){
   var ch=text[i];
   if(q){ if(ch=='"'){ if(text[i+1]=='"'){f+='"';i++;} else q=false; } else f+=ch; }
-  else if(ch=='"') q=true;
-  else if(ch==","){row.push(f);f="";}
+  else if(ch=='"'&&f.trim()==="") {q=true;f="";}
+  else if(ch==delim){row.push(f);f="";}
   else if(ch=="\n"||ch=="\r"){ if(ch=="\r"&&text[i+1]=="\n")i++; row.push(f);rows.push(row);row=[];f=""; }
   else f+=ch;
  }
  row.push(f);rows.push(row);
  return rows;
 }
+// Column names we recognize (any capitalization). Covers our own CSV, BAM 2.0 exports, and common spreadsheet headings.
+var COLS={
+ name:["name","property name","property","building name","building","amenity","amenity name","business name","location name","location","title","tenant"],
+ cat:["category","group name","group","type","amenity type","category name","use","property type"],
+ addr:["address","street address","full address","address 1","address line 1","street"],
+ city:["city"],state:["state","st"],zip:["zip","zip code","zipcode","postal code","postcode"],
+ lat:["latitude","lat","y"],lng:["longitude","long","lng","lon","x"],
+ web:["website","url","web site","web","link","site"]
+};
+function normHead(h){return String(h||"").replace(/^\uFEFF/,"").replace(/\s+/g," ").trim().toLowerCase();}
 function readData(text){
- text=text.replace(/^\uFEFF/,"").trim();
- if(!text) return {error:"No data found."};
- var rows=parseRows(text);
- var head=rows.shift().map(function(h){return h.trim().toLowerCase();});
+ text=String(text||"").replace(/^\uFEFF/,"").replace(/^\s*\n/,"").replace(/\s+$/,"");
+ if(!text.trim()) return {error:"No data found."};
+ var first=text.split(/\r?\n/)[0];
+ var delim=(first.split("\t").length>first.split(",").length)?"\t":(first.split(";").length>first.split(",").length?";":",");
+ var rows=parseRows(text,delim);
+ var head=rows.shift().map(normHead);
  function col(names){for(var i=0;i<names.length;i++){var k=head.indexOf(names[i]);if(k>=0)return k;}return -1;}
- var c={name:col(["name"]),cat:col(["category"]),addr:col(["address"]),lat:col(["latitude","lat"]),lng:col(["longitude","lng","lon","long"]),web:col(["website","url"])};
- if(c.name<0||c.lat<0||c.lng<0) return {error:"The CSV needs Name, Latitude and Longitude columns.\nThe header row should be: Name,Category,Address,Latitude,Longitude,Website"};
+ var c={};for(var k in COLS)c[k]=col(COLS[k]);
+ if(c.name<0||c.lat<0||c.lng<0) return {error:"Couldn't find the name and coordinate columns.\nThe first row needs headings like:\n• Name, Latitude, Longitude (our template), or\n• Property Name, Lat, Long (BAM 2.0)"};
  var items=[],skipped=[];
  rows.forEach(function(r,i){
   if(!r.join("").trim()) return;
   var g=function(k){return k<0?"":(r[k]||"").trim();};
-  var o={name:g(c.name),category:g(c.cat),address:g(c.addr),lat:parseFloat(g(c.lat)),lng:parseFloat(g(c.lng)),website:g(c.web)};
+  var addr=g(c.addr),city=g(c.city),stz=(g(c.state)+" "+g(c.zip)).trim();
+  if(city&&addr.toLowerCase().indexOf(city.toLowerCase())<0)addr+=(addr?", ":"")+city;
+  if(stz&&addr.indexOf(stz)<0)addr+=(addr?", ":"")+stz;
+  var o={name:g(c.name),category:g(c.cat),address:addr,lat:parseFloat(g(c.lat)),lng:parseFloat(g(c.lng)),website:g(c.web)};
   if(isNaN(o.lat)||isNaN(o.lng)||Math.abs(o.lat)>90||Math.abs(o.lng)>180){skipped.push((o.name||"Row "+(i+2))+" (missing or invalid coordinates)");return;}
   items.push(o);
  });
- var prop=items.filter(function(o){return o.category.toLowerCase()=="subject property";})[0];
- if(!prop) return {error:'No row with Category "Subject Property" was found.\nAdd the property itself as a row with that exact category.'};
- return {text:text,property:prop,amenities:items.filter(function(o){return o!==prop;}),skipped:skipped};
+ if(!items.length) return {error:"None of the rows had usable coordinates."+(skipped.length?"\nSkipped: "+skipped.slice(0,5).join("; "):"")};
+ var prop=items.filter(function(o){return /^subject( property)?$/i.test(o.category);})[0];
+ return {items:items,property:prop||null,skipped:skipped};
+}
+// Turn whatever came in into our standard CSV, so saved maps and downloads are always consistent
+function csvCell(v){v=String(v==null?"":v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function toStandardCSV(prop,list){
+ var out=["Name,Category,Address,Latitude,Longitude,Website"];
+ [prop].concat(list).forEach(function(o,i){
+  out.push([csvCell(o.name),i===0?"Subject Property":csvCell(o.category),csvCell(o.address),o.lat.toFixed(6),o.lng.toFixed(6),csvCell(o.website)].join(","));
+ });
+ return out.join("\n");
+}
+function toBamCSV(){
+ var out=["Group Name,Property Name,Address,City,State,ZIP,Lat,Long"];
+ [DATA.property].concat(DATA.amenities).forEach(function(o,i){
+  out.push([csvCell(i===0?"Subject Property":(o.category||"Other")),csvCell(o.name),csvCell(o.address),"","","",o.lat.toFixed(6),o.lng.toFixed(6)].join(","));
+ });
+ return out.join("\r\n");
 }
 
 /* ---------- Map ---------- */
@@ -416,15 +483,58 @@ function isolate(ci,initial){
 }
 
 /* ---------- Loading data ---------- */
-function loadText(text){
- var d=readData(text);
- if(d.error){$("msg").textContent=d.error;showLoader();return false;}
+var PENDING=null;
+function finishLoad(prop,amenities,skipped){
+ var d={property:prop,amenities:amenities,skipped:skipped||[]};
+ d.text=toStandardCSV(prop,amenities);
  render(d);
- $("loader").classList.add("hide");$("msg").textContent="";$("paste").value="";
+ $("loader").classList.add("hide");$("msg").textContent="";$("paste").value="";showStep("stepLoad");
  document.body.classList.remove("view");
  return true;
 }
+function loadText(text){
+ var d=readData(text);
+ if(d.error){$("msg").textContent=d.error;showLoader();return false;}
+ if(d.property) return finishLoad(d.property,d.items.filter(function(o){return o!==d.property;}),d.skipped);
+ // No "Subject Property" row (e.g. a BAM export): ask which one is the property
+ PENDING=d;var sel=$("propPick");sel.innerHTML="";
+ d.items.forEach(function(o,i){var op=document.createElement("option");op.value=i;op.textContent=o.name+(o.address?" — "+o.address:"");sel.appendChild(op);});
+ var op=document.createElement("option");op.value="manual";op.textContent="It's not in this file — enter it myself";sel.appendChild(op);
+ sel.value="0";$("propManual").hidden=true;$("msg2").textContent="";
+ showLoader();showStep("stepProp");
+ return false;
+}
+function showStep(id){$("stepLoad").hidden=id!="stepLoad";$("stepProp").hidden=id!="stepProp";}
+$("propPick").onchange=function(){$("propManual").hidden=this.value!="manual";};
+$("btnPropBack").onclick=function(){PENDING=null;showStep("stepLoad");};
+$("btnPropUse").onclick=function(){
+ if(!PENDING)return;var v=$("propPick").value,prop,rest;
+ if(v=="manual"){
+  var lat=parseFloat($("mLat").value),lng=parseFloat($("mLng").value);
+  if(!$("mName").value.trim()||isNaN(lat)||isNaN(lng)||Math.abs(lat)>90||Math.abs(lng)>180){$("msg2").textContent="Please enter a name and valid latitude/longitude numbers.";return;}
+  prop={name:$("mName").value.trim(),category:"Subject Property",address:$("mAddr").value.trim(),lat:lat,lng:lng,website:""};
+  rest=PENDING.items;
+ }else{
+  prop=PENDING.items[+v];rest=PENDING.items.filter(function(o){return o!==prop;});
+ }
+ var sk=PENDING.skipped;PENDING=null;finishLoad(prop,rest,sk);
+};
+function loadXlsx(f){
+ function go(){
+  var r=new FileReader();
+  r.onload=function(){
+   try{var wb=XLSX.read(new Uint8Array(r.result),{type:"array"});loadText(XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]));}
+   catch(e){$("msg").textContent="Couldn't read that Excel file. Try saving it as CSV UTF-8 instead.";showLoader();}
+  };
+  r.readAsArrayBuffer(f);
+ }
+ if(window.XLSX)return go();
+ var sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+ sc.onload=go;sc.onerror=function(){$("msg").textContent="Couldn't load the Excel reader. Save the file as CSV UTF-8 and try again.";showLoader();};
+ document.head.appendChild(sc);
+}
 function loadFile(f){
+ if(/\.xlsx?$/i.test(f.name))return loadXlsx(f);
  var r=new FileReader();
  r.onload=function(){
   if(r.result.indexOf("\uFFFD")>=0){ // not UTF-8 (e.g. Excel "CSV" instead of "CSV UTF-8")
@@ -434,6 +544,31 @@ function loadFile(f){
  r.readAsText(f,"utf-8");
 }
 function showLoader(){$("loader").classList.remove("hide");$("btnCancel").style.display=DATA?"":"none";}
+
+/* ---------- Template & sample prompt ---------- */
+var SAMPLE_PROMPT=["Make me a downloadable CSV file of amenities within a [15-minute walk] of [Property Name, full street address].",
+"",
+"Use these exact column headers, in this order: Name, Category, Address, Latitude, Longitude, Website",
+"",
+"• First row: the property itself, with Category = Subject Property",
+"• Categories (use these exact names): [Café, Restaurant, Fitness, Hotel, Retail]",
+"• Up to [8] places per category, closest first",
+"• Latitude and Longitude to 6 decimal places, pinpointing the actual business, not the street or neighborhood",
+"• Only include places that are currently open and that you can verify; leave anything you can't verify out and list it separately",
+"• Website = the official homepage; leave it blank if there isn't one. Never guess a URL."].join("\n");
+$("samplePrompt").value=SAMPLE_PROMPT;
+$("btnCopyPrompt").onclick=function(){
+ var t=$("samplePrompt"),b=this;
+ function done(){b.textContent="Copied!";setTimeout(function(){b.textContent="Copy prompt";},1800);}
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t.value).then(done,function(){t.select();document.execCommand("copy");done();});
+ else{t.select();document.execCommand("copy");done();}
+};
+$("btnTemplate").onclick=function(){
+ download("\uFEFF"+["Name,Category,Address,Latitude,Longitude,Website",
+  '"Your Property Name (keep this row first)",Subject Property,"123 Main St, City, ST 00000",37.789800,-122.396800,',
+  '"Example Cafe (replace or delete)",Café,"456 Market St, City, ST 00000",37.790500,-122.395100,https://example.com'].join("\r\n"),
+  "text/csv;charset=utf-8","Amenity_Map_Template.csv");
+};
 
 $("drop").onclick=function(){$("file").click();};
 $("file").onchange=function(){if(this.files[0])loadFile(this.files[0]);this.value="";};
@@ -514,6 +649,7 @@ function download(content,type,name){
  a.download=name;document.body.appendChild(a);a.click();a.remove();
 }
 $("btnCsv").onclick=function(){download("\uFEFF"+DATA.text.replace(/\r?\n/g,"\r\n"),"text/csv;charset=utf-8",fileBase()+"_Amenities.csv");};
+$("btnBam").onclick=function(){download("\uFEFF"+toBamCSV(),"text/csv;charset=utf-8",fileBase()+"_BAM.csv");};
 $("btnSave").onclick=function(){
  var dataTag='<script id="csv-data" type="text/csv" data-mode="view">\n'+DATA.text.replace(/<\//g,"<\\/")+'\n<\/script>';
  var lookTag='<script id="settings-data" type="application/json">'+JSON.stringify(S).replace(/</g,"\\u003c")+'<\/script>';
