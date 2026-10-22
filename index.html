@@ -28,6 +28,8 @@ h2{margin:0 0 4px;font:600 22px/1.25 var(--head-font)}
 #tools button{display:block;width:100%;margin:8px 0 0;padding:10px;border:0;border-radius:6px;font:600 14px var(--body-font);cursor:pointer;background:var(--accent);color:var(--accent-text)}
 #tools button.ghost{background:transparent;color:var(--side-text);border:1px solid color-mix(in srgb,var(--side-text) 45%,transparent)}
 #tools .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+.guidelink{display:block;text-align:center;margin-top:10px;color:var(--side-text);opacity:.85;font-size:13px;text-decoration:underline}
+.guidelink:hover{opacity:1}
 #note{font-size:12px;opacity:.8;margin-top:10px;white-space:pre-line}
 body.view #tools{display:none}
 .leaflet-container{font-family:var(--body-font)}
@@ -173,6 +175,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
    <button id="btnCsv" class="ghost">Download CSV</button>
    <button id="btnBam" class="ghost">Download CSV for BAM 2.0</button>
    <button id="btnLoad" class="ghost">Load different data</button>
+   <a class="guidelink" href="https://norcal-ccg.github.io/mapGenerator/Amenity_Map_Maker_Guide.pdf" target="_blank" rel="noopener">How-to guide (PDF)</a>
    <div id="note"></div>
   </div>
  </div>
@@ -183,7 +186,7 @@ textarea{width:100%;box-sizing:border-box;height:110px;font:12px Consolas,monosp
  <div class="panel">
   <div id="stepLoad">
    <h3>Load amenity data</h3>
-   <p>Drop in a file from <b>BAM 2.0</b>, Copilot, or your own spreadsheet (.csv or .xlsx), or paste rows copied from Excel below.</p>
+   <p>Drop in a file from <b>BAM 2.0</b>, Copilot, or your own spreadsheet (.csv or .xlsx), or paste rows copied from Excel below. New here? See the <a href="https://norcal-ccg.github.io/mapGenerator/Amenity_Map_Maker_Guide.pdf" target="_blank" rel="noopener">how-to guide</a>.</p>
    <div id="drop">Drop a .csv or .xlsx file here, or click to choose one</div>
    <input type="file" id="file" accept=".csv,.txt,.xlsx,.xls,text/csv" hidden>
    <textarea id="paste" placeholder="Paste here, header row included. Works with BAM 2.0 columns (Property Name, Address, Lat, Long) or Name, Category, Address, Latitude, Longitude, Website"></textarea>
